@@ -1,0 +1,91 @@
+CreatePostScreen - Modifications du 2026-05-01
+==============================================
+
+Objectif de cette modification
+------------------------------
+Permettre de tester HomeFeedScreen avec de vraies donnees MongoDB.
+CreatePostScreen ne cree plus seulement un message demo: il envoie maintenant
+une vraie publication au backend FastAPI.
+
+
+Fichiers modifies
+-----------------
+1. mobile/src/screens/CreatePostScreen.tsx
+   - Ajout de useAuth pour recuperer le token JWT.
+   - Ajout du client API.
+   - Ajout de Alert pour les messages succes/erreur.
+   - Ajout de l'etat isPublishing.
+   - Le bouton "Publier la tenue" appelle maintenant client.createPost.
+
+2. mobile/src/services/api/apiClient.ts
+   - Ajout de createPost.
+   - Envoie:
+     caption
+     image_urls
+     hashtags
+     garment_tags
+   - Utilise Authorization: Bearer <token>.
+
+3. backend/app/modules/social/router.py
+   - Ajout:
+     POST /api/v1/posts
+
+4. backend/app/modules/social/service.py
+   - Ajout creation MongoDB dans la collection posts.
+   - Les posts stockent:
+     _id
+     id
+     author_id
+     caption
+     hashtags
+     garment_tags
+     image_urls
+     like_user_ids
+     comment_count
+     created_at
+     updated_at
+
+
+Logique implementee
+-------------------
+- Validation cote mobile:
+  - token obligatoire
+  - imageUrl obligatoire
+  - caption obligatoire
+
+- Publication:
+  - envoie la requete POST /api/v1/posts
+  - sauvegarde en MongoDB
+  - affiche une alerte de succes
+  - indique a l'utilisateur de revenir au feed et tirer vers le bas pour rafraichir
+
+- En cas d'erreur:
+  - message d'erreur affiche dans l'ecran
+  - Alert affichee
+  - bouton reactive apres la fin de la requete
+
+
+Comment tester
+--------------
+1. Lancer backend + MongoDB.
+2. Ouvrir l'app mobile.
+3. Se connecter.
+4. Aller dans l'onglet Publier.
+5. Garder ou modifier:
+   - URL image
+   - description
+   - hashtags
+6. Cliquer sur "Publier la tenue".
+7. Revenir au Feed.
+8. Tirer vers le bas pour rafraichir.
+9. La publication doit apparaitre depuis MongoDB.
+
+
+Validation effectuee
+--------------------
+- npm run typecheck OK.
+- Test API local OK:
+  - login
+  - POST /api/v1/posts
+  - GET /api/v1/feed
+  - verification document dans dressme.posts

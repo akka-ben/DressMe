@@ -15,8 +15,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { AppTab, TabBar } from "./src/components/TabBar";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { CreatePostScreen } from "./src/screens/CreatePostScreen";
-import { FeedScreen } from "./src/screens/FeedScreen";
 import { ForgotPasswordScreen } from "./src/screens/ForgotPasswordScreen";
+import { HomeFeedScreen } from "./src/screens/HomeFeedScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
@@ -24,7 +24,7 @@ import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { MessagesScreen } from "./src/screens/MessagesScreen";
-import { colors, fonts, radius } from "./src/theme/dressme";
+import { colors, fonts } from "./src/theme/dressme";
 
 const splashGif = require("./assets/dressme-splash.gif");
 
@@ -107,7 +107,7 @@ function AppShell() {
   const renderTab = () => {
     switch (activeTab) {
       case "feed":
-        return <FeedScreen />;
+        return <HomeFeedScreen />;
       case "search":
         return <SearchScreen />;
       case "create":
@@ -137,21 +137,23 @@ function AppShell() {
                 </Text>
               ) : null}
 
-              <ScrollView
-                style={styles.screen}
-                contentContainerStyle={styles.screenContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {isLoading ? (
-                  <View style={styles.loadingState}>
-                    <ActivityIndicator color={colors.burgundy} />
-                  </View>
-                ) : isAuthenticated && authRoute !== "reset" ? (
-                  renderTab()
-                ) : (
-                  renderAuth()
-                )}
-              </ScrollView>
+              {isLoading ? (
+                <View style={[styles.screen, styles.loadingState]}>
+                  <ActivityIndicator color={colors.burgundy} />
+                </View>
+              ) : isAuthenticated && authRoute !== "reset" ? (
+                <View style={styles.tabScreen}>
+                  {renderTab()}
+                </View>
+              ) : (
+                <ScrollView
+                  style={styles.screen}
+                  contentContainerStyle={styles.screenContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {renderAuth()}
+                </ScrollView>
+              )}
 
               {isAuthenticated && authRoute !== "reset" ? (
                 <TabBar activeTab={activeTab} onChange={setActiveTab} />
@@ -215,6 +217,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   screen: {
+    flex: 1,
+    backgroundColor: colors.cream,
+  },
+  tabScreen: {
     flex: 1,
     backgroundColor: colors.cream,
   },

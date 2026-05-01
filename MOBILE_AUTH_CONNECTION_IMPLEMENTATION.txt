@@ -46,16 +46,6 @@ Fichiers crees
    - Ajout d'un exemple de configuration mobile:
      EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
 
-3. mobile/src/screens/ResetPasswordScreen.tsx
-   - Ecran permettant de saisir un nouveau mot de passe.
-   - Validation:
-     token present
-     password min 8 caracteres
-     confirmation identique
-   - Appel au backend:
-     POST /auth/reset-password
-   - Retour vers Login apres reset reussi.
-
 
 Fichiers modifies
 -----------------
@@ -70,7 +60,6 @@ Fichiers modifies
      POST /auth/login
      POST /auth/register
      POST /auth/forgot-password
-     POST /auth/reset-password
      GET /auth/me
    - Ajout du header:
      Authorization: Bearer <token>
@@ -139,10 +128,6 @@ Fichiers modifies
    - Affichage loading pendant la restauration de session.
    - Logout supprime le token AsyncStorage.
    - L'app affiche directement le Feed si le token stocke est valide.
-   - Lecture des liens reset password avec Linking.
-   - Extraction de token depuis:
-     /reset-password?token=...
-   - Affichage direct de ResetPasswordScreen quand le lien email est ouvert.
 
 9. mobile/src/components/PrimaryButton.tsx
    - Ajout de la prop disabled.
@@ -165,10 +150,6 @@ Fichiers modifies
 
 14. .env.example
     - Ajout de:
-      EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
-
-15. mobile/.env
-    - Ajout de l'URL backend locale effective:
       EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
 
 
@@ -219,11 +200,6 @@ Flux final implemente
 7. Logout:
    - suppression du token
    - retour au flow non authentifie
-8. Forgot password:
-   - demande de reset via email
-   - reception du lien /reset-password?token=...
-   - ouverture directe de l'ecran Reset Password
-   - changement du mot de passe via /auth/reset-password
 
 
 Configuration importante

@@ -1,0 +1,168 @@
+HomeFeedScreen - Modifications du 2026-05-01
+============================================
+
+Objectif de cette phase
+-----------------------
+Debut du GROUPE 1: Feed + Reels + Social Core.
+Premier ecran traite: HomeFeedScreen.
+
+Fichiers modifies / ajoutes
+---------------------------
+1. mobile/src/screens/HomeFeedScreen.tsx
+   - Nouveau fichier principal pour le feed.
+   - Remplace l'ancien rendu simple par un feed virtualise avec FlatList.
+
+2. mobile/src/screens/FeedScreen.tsx
+   - Transforme en alias:
+     export { HomeFeedScreen as FeedScreen } from "./HomeFeedScreen";
+   - Objectif: garder la compatibilite avec les anciens imports.
+
+3. mobile/App.tsx
+   - Remplacement du rendu FeedScreen par HomeFeedScreen.
+   - Les tabs authentifiees ne sont plus encapsulees dans un ScrollView global.
+   - Objectif: permettre a HomeFeedScreen de controler son propre scroll avec FlatList.
+   - Les ecrans auth restent dans un ScrollView.
+
+
+Logique implementee
+-------------------
+1. Scroll infini mocke
+   - Utilisation de FlatList.
+   - onEndReached charge une nouvelle page de posts.
+   - PAGE mockee a partir des posts existants.
+   - MAX_MOCK_PAGES limite le nombre de pages simulees.
+   - loadingMore affiche un spinner en bas.
+   - loadLockRef evite les appels multiples de onEndReached.
+
+2. Performance feed
+   - FlatList avec:
+     initialNumToRender=4
+     maxToRenderPerBatch=4
+     windowSize=7
+     updateCellsBatchingPeriod=60
+     removeClippedSubviews
+   - PostCard est memoise avec React.memo.
+   - Handlers stabilises avec useCallback:
+     toggleLike
+     toggleSave
+     votePoll
+     openStory
+     refreshFeed
+     loadMorePosts
+   - visiblePosts calcule avec useMemo.
+   - Prefetch des images des premiers posts visibles.
+
+3. Pull to refresh
+   - Ajout de RefreshControl.
+   - Le refresh remet le feed a la premiere page.
+   - Etat refreshing gere proprement.
+
+4. Interactions sociales
+   - Like / unlike avec compteur instantane.
+   - Save / unsave post.
+   - Vote sondage.
+   - Un vote par instance de post grace a selectedPollOptionId.
+   - Option votee affichee avec bordure burgundy.
+
+5. Stories
+   - Stories conservees en horizontal.
+   - Passage de ScrollView horizontal a FlatList horizontal.
+   - Ouverture story en modal plein ecran.
+   - Story marquee comme vue apres ouverture.
+
+6. Filtres
+   - Filtres conserves:
+     Tous, #casual, #soiree, #streetwear, #glam, #vintage
+   - Passage de ScrollView horizontal a FlatList horizontal.
+   - Etat vide ajoute si aucun post ne correspond au filtre.
+
+7. Notifications et IA
+   - Le bouton notifications ouvre encore la modal existante.
+   - Le bouton IA ouvre encore DressMe Stylist.
+   - Ces parties seront separees plus tard dans NotificationsScreen et ecrans IA si necessaire.
+
+
+Pourquoi ce changement est important
+------------------------------------
+L'ancien feed utilisait un rendu map dans un ScrollView.
+Ce modele ne convient pas pour un feed lourd avec:
+- beaucoup de posts
+- scroll infini
+- videos/reels
+- interactions frequentes
+- besoin de performance mobile
+
+FlatList est plus adaptee parce qu'elle virtualise les elements et evite de garder tout le feed rendu en memoire.
+
+
+Etat actuel
+-----------
+- HomeFeedScreen est fonctionnel.
+- Le design global est conserve.
+- Le feed charge maintenant les donnees depuis FastAPI/MongoDB:
+  GET /api/v1/feed?limit=10&offset=0
+- Le feed supporte toujours le chargement pagine en scrollant.
+- Le pull to refresh fonctionne.
+- Likes synchronises avec le backend:
+  POST /api/v1/posts/{post_id}/like
+- Sauvegardes et votes restent locaux pour le moment.
+- Stories restent basees sur les donnees locales de demo pour cette phase.
+- TypeScript OK avec npm run typecheck.
+
+
+Backend ajoute pour cet ecran
+-----------------------------
+1. backend/app/modules/social/service.py
+   - Nouveau service social MongoDB.
+   - Lecture des posts depuis la collection posts.
+   - Mapping Post MongoDB -> PostDTO.
+   - Enrichissement auteur depuis la collection users.
+   - Toggle like avec le champ like_user_ids.
+
+2. backend/app/modules/social/router.py
+   - GET /feed connecte a MongoDB.
+   - GET /posts/{post_id} connecte a MongoDB.
+   - POST /posts/{post_id}/like connecte a MongoDB.
+
+3. backend/app/db/session.py
+   - Ajout indexes posts:
+     posts_created_at
+     posts_author_id
+
+4. backend/app/schemas/contracts.py
+   - Ajout CreatePostInput.
+   - UserDTO accepte maintenant email/nom optionnels pour etre compatible avec MongoDB.
+
+
+Integration mobile ajoutee
+--------------------------
+1. mobile/src/services/api/apiClient.ts
+   - getFeed accepte token, limit, offset.
+   - Ajout createPost.
+   - Ajout togglePostLike.
+
+2. mobile/src/services/types.ts
+   - Interface DressMeClient mise a jour.
+
+3. mobile/src/services/mock/mockClient.ts
+   - Signatures createPost/togglePostLike ajoutees pour garder TypeScript valide.
+
+
+Test reel effectue
+------------------
+- Login API OK avec un utilisateur MongoDB.
+- Creation d'un post via POST /api/v1/posts OK.
+- Lecture du feed via GET /api/v1/feed OK.
+- Verification MongoDB:
+  collection dressme.posts contient le post cree.
+
+
+Limites restantes pour prochaine phase
+--------------------------------------
+- Les posts du feed sont maintenant reels depuis MongoDB.
+- La creation de post est reelle via CreatePostScreen.
+- Les likes sont synchronises backend.
+- Les saves, votes sondage et stories restent a connecter au backend.
+- Les videos seront traitees dans ReelsScreen.
+- Les notifications seront traitees dans NotificationsScreen.
+- Le detail post sera traite dans PostDetailScreen.

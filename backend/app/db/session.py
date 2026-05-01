@@ -63,3 +63,5 @@ async def init_db() -> None:
         "users_verification_token_unique",
     )
     await ensure_unique_string_index("users", "reset_token", "users_reset_token_unique")
+    await database.posts.create_index([("created_at", ASCENDING)], name="posts_created_at")
+    await database.posts.create_index([("author_id", ASCENDING)], name="posts_author_id")

@@ -202,9 +202,56 @@ export class ApiDressMeClient implements DressMeClient {
     return mapUser(user);
   }
 
-  async getFeed(): Promise<Post[]> {
-    const posts = await this.request<BackendPost[]>("/feed");
+  async getFeed(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]> {
+    const params = new URLSearchParams();
+    if (input?.limit) {
+      params.set("limit", String(input.limit));
+    }
+    if (input?.offset) {
+      params.set("offset", String(input.offset));
+    }
+
+    const query = params.toString();
+    const posts = await this.request<BackendPost[]>(
+      query ? `/feed?${query}` : "/feed",
+      undefined,
+      input?.token,
+    );
     return posts.map(mapPost);
+  }
+
+  async createPost(
+    input: {
+      caption: string;
+      imageUrls: string[];
+      hashtags: string[];
+      garmentTags?: string[];
+    },
+    token: string,
+  ): Promise<Post> {
+    const post = await this.request<BackendPost>(
+      "/posts",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          caption: input.caption,
+          image_urls: input.imageUrls,
+          hashtags: input.hashtags,
+          garment_tags: input.garmentTags ?? [],
+        }),
+      },
+      token,
+    );
+    return mapPost(post);
+  }
+
+  async togglePostLike(postId: string, token: string): Promise<Post> {
+    const post = await this.request<BackendPost>(
+      `/posts/${postId}/like`,
+      { method: "POST" },
+      token,
+    );
+    return mapPost(post);
   }
 
   async getPostComments(postId: string): Promise<Comment[]> {

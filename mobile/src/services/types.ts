@@ -19,7 +19,17 @@ export interface DressMeClient {
   forgotPassword(email: string): Promise<AuthMessage>;
   resetPassword(token: string, newPassword: string): Promise<AuthMessage>;
   getMe(token: string): Promise<User>;
-  getFeed(): Promise<Post[]>;
+  getFeed(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]>;
+  createPost(
+    input: {
+      caption: string;
+      imageUrls: string[];
+      hashtags: string[];
+      garmentTags?: string[];
+    },
+    token: string,
+  ): Promise<Post>;
+  togglePostLike(postId: string, token: string): Promise<Post>;
   getPostComments(postId: string): Promise<Comment[]>;
   getProfile(userId: string): Promise<Profile>;
   helpMeChoose(input: {

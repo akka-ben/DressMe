@@ -6,9 +6,9 @@ from pydantic import BaseModel, EmailStr, Field
 
 class UserDTO(BaseModel):
     id: str
-    first_name: str
-    last_name: str
-    email: EmailStr
+    first_name: str | None = None
+    last_name: str | None = None
+    email: EmailStr | None = None
     avatar_url: str | None = None
     bio: str | None = None
 
@@ -51,6 +51,13 @@ class PostDTO(BaseModel):
     liked_by_me: bool = False
     created_at: datetime
     poll: PollDTO | None = None
+
+
+class CreatePostInput(BaseModel):
+    caption: str = Field(..., min_length=1, max_length=1200)
+    image_urls: list[str] = Field(..., min_length=1, max_length=6)
+    hashtags: list[str] = Field(default_factory=list, max_length=12)
+    garment_tags: list[str] = Field(default_factory=list, max_length=12)
 
 
 class AuthTokenDTO(BaseModel):

@@ -1,6 +1,6 @@
 import { mockComments, mockPosts, mockProfile, mockRecommendations } from "./mockData";
 import type { DressMeClient } from "../types";
-import type { AuthMessage, AuthSession, User } from "../../types/contracts";
+import type { AuthMessage, AuthSession, Post, User } from "../../types/contracts";
 
 
 const delay = async (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,6 +30,14 @@ export class MockDressMeClient implements DressMeClient {
   async getFeed() {
     await delay();
     return mockPosts;
+  }
+
+  async createPost(): Promise<Post> {
+    throw new Error("Mock createPost is disabled. Use ApiDressMeClient.");
+  }
+
+  async togglePostLike(): Promise<Post> {
+    throw new Error("Mock togglePostLike is disabled. Use ApiDressMeClient.");
   }
 
   async getPostComments() {

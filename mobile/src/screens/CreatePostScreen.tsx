@@ -1,22 +1,61 @@
 import React, { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Camera, HelpCircle, Shirt, Tags, X } from "lucide-react-native";
 
 import { PrimaryButton } from "../components/PrimaryButton";
+import { useAuth } from "../context/AuthContext";
+import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
 
 const defaultImage = "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=900";
 
 export function CreatePostScreen() {
+  const { token } = useAuth();
   const [imageUrl, setImageUrl] = useState(defaultImage);
   const [caption, setCaption] = useState("Tenue du soir: blazer creme, satin noir et accessoire dore.");
   const [hashtags, setHashtags] = useState("#soirée #chic #burgundy");
-  const [message, setMessage] = useState("Votre publication sera ajoutee en tete du feed demo.");
+  const [message, setMessage] = useState("Votre publication sera enregistree dans MongoDB.");
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const parsedTags = hashtags
     .split(" ")
     .filter((tag) => tag.startsWith("#"))
     .slice(0, 5);
+
+  const publishPost = async () => {
+    if (!token) {
+      Alert.alert("Session requise", "Connecte-toi avant de publier une tenue.");
+      return;
+    }
+
+    if (!imageUrl.trim() || !caption.trim()) {
+      Alert.alert("Champs incomplets", "Ajoute au moins une image et une description.");
+      return;
+    }
+
+    setIsPublishing(true);
+    setMessage("Publication en cours...");
+    try {
+      await client.createPost(
+        {
+          caption: caption.trim(),
+          imageUrls: [imageUrl.trim()],
+          hashtags: parsedTags,
+          garmentTags: [],
+        },
+        token,
+      );
+      setMessage("Publication creee dans MongoDB. Retourne au Feed et tire vers le bas pour rafraichir.");
+      Alert.alert("Publication creee", "La tenue est maintenant stockee dans MongoDB.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossible de publier cette tenue.";
+      setMessage(message);
+      Alert.alert("Publication echouee", message);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -88,8 +127,9 @@ export function CreatePostScreen() {
       </View>
 
       <PrimaryButton
-        label="Publier la tenue"
-        onPress={() => setMessage("Publication creee. Elle apparaitra en tete du feed dans la prochaine integration.")}
+        label={isPublishing ? "Publication..." : "Publier la tenue"}
+        disabled={isPublishing}
+        onPress={() => void publishPost()}
       />
       <Text style={styles.note}>{message}</Text>
     </View>
