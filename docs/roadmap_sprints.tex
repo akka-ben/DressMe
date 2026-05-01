@@ -1,0 +1,98 @@
+\begin{table}[H]
+\centering
+\scriptsize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{|c|X|X|X|X|X|}
+\hline
+\textbf{Sprint} & \textbf{Objectif principal} & \textbf{Frontend / Mock-first} & \textbf{Backend / Intégration} & \textbf{Livrables} & \textbf{Critères de sortie} \\
+\hline
+\textbf{Sprint 1\\Fondations UX + Mock} &
+Valider les parcours clés de l'application avec des données simulées et figer les contrats techniques. &
+- Initialiser React Native bare + TypeScript.
+- Mettre en place navigation, thème, composants UI réutilisables.
+- Créer les écrans : onboarding, login, register, forgot password, home feed, post detail, create post, profile.
+- Implémenter un store local et un dossier \texttt{services/mock}.
+- Simuler utilisateurs, posts, commentaires, followers, conversations.
+- Ajouter upload image simulé, feed chronologique simulé, likes/commentaires simulés. &
+- Initialiser FastAPI, PostgreSQL, Redis, Alembic, Docker Compose.
+- Créer modèles de base : User, Follow, Post, PostMedia, Comment, Like.
+- Implémenter auth JWT, refresh token, hash bcrypt.
+- Préparer structure modulaire backend et conventions d'API.
+- Documenter les DTO v1 pour alignement frontend/backend. &
+- App mobile navigable de bout en bout en mode mock.
+- Backend démarrable localement avec auth prête.
+- Contrats API versionnés.
+- Maquette fonctionnelle présentable. &
+- Un utilisateur peut parcourir toute l'app sans backend réel.
+- Les types frontend sont figés.
+- Le backend permet déjà register/login/me.
+- L'équipe valide les parcours UX avant branchement réel. \\
+\hline
+\textbf{Sprint 2\\Social + Intégration Progressive API} &
+Remplacer les mocks des fonctionnalités sociales par le backend réel sans casser l'UX validée. &
+- Connecter login/register/refresh au backend.
+- Remplacer progressivement le feed mock par les vraies données.
+- Brancher création de post, affichage profil, follow/unfollow, likes, commentaires.
+- Garder des fallbacks mock pour les écrans non encore branchés.
+- Ajouter écran de vote ``Tenue A vs Tenue B'' côté UI. &
+- Finaliser endpoints : auth, profile, upload média, posts, feed, comments, likes, follows, polls.
+- Intégrer stockage MinIO/S3.
+- Ajouter pagination feed.
+- Contrôles d'accès et validation des uploads.
+- Préparer conversations directes et structure de messages. &
+- Parcours social principal connecté au backend réel.
+- Création de posts avec images fonctionnelle.
+- Vote communautaire disponible.
+- Documentation API sociale mise à jour. &
+- Un utilisateur réel peut s'inscrire, publier, suivre, liker, commenter.
+- Le feed se charge depuis PostgreSQL.
+- Les uploads image fonctionnent sur environnement local/staging.
+- Les mocks restants sont clairement isolés. \\
+\hline
+\textbf{Sprint 3\\Temps Réel + WebRTC Progressif} &
+Livrer le temps réel en plusieurs niveaux : chat stable, appel audio, puis vidéo. &
+- Implémenter UI de conversations 1:1.
+- Brancher Socket.IO côté mobile pour messages, présence, accusés de lecture.
+- Ajouter partage d'un post dans le chat.
+- Créer écran d'appel avec états : ringing, connecting, in-call, ended.
+- Intégrer d'abord l'appel audio, puis activer la vidéo et le switch caméra. &
+- Mettre en place Socket.IO backend.
+- Gérer conversations directes, messages texte/image/post partagé.
+- Ajouter présence online/offline et statuts sent/delivered/read.
+- Implémenter signalisation WebRTC via Socket.IO.
+- Déployer Coturn et tester ICE/STUN/TURN.
+- Journaliser les erreurs d'appel et timeouts. &
+- Chat temps réel 1:1 complet.
+- Appel audio 1:1 stable.
+- Appel vidéo 1:1 fonctionnel sur cas nominal.
+- Rapport de tests réseau réels. &
+- Deux utilisateurs peuvent chatter en temps réel.
+- Les messages image et post partagé fonctionnent.
+- L'appel audio passe sur Wi-Fi et 4G.
+- La vidéo fonctionne au moins sur scénario nominal avec TURN de secours. \\
+\hline
+\textbf{Sprint 4\\IA + Finition + Démo} &
+Remplacer les derniers mocks critiques par l'IA réelle et préparer une version de démonstration stable. &
+- Ajouter bouton ``Help Me Choose'' sur post/photo.
+- Créer écran résultats IA avec 3 cards visuelles.
+- Permettre le partage d'une recommandation IA dans le chat.
+- Ajouter loaders, retry, états d'erreur et UX de fallback.
+- Finaliser polish visuel et cohérence navigation. &
+- Implémenter endpoint \texttt{/ai/help-me-choose}.
+- Ajouter service IA avec mode mock/dev et mode OpenAI/staging.
+- Construire prompt pipeline avec historique, occasion, style.
+- Mesurer latence et protéger par timeout.
+- Finaliser sécurité, rate limiting, logs, configuration staging HTTPS.
+- Préparer script seed de démonstration. &
+- Assistant IA intégré.
+- Démo MVP stable de bout en bout.
+- Environnement staging présentable.
+- Jeu de données de démonstration prêt. &
+- Un utilisateur peut demander un avis IA et recevoir 3 suggestions.
+- La réponse IA reste dans la cible de temps prévue ou bascule vers un fallback propre.
+- L'application est démontrable sans intervention manuelle technique.
+- Tous les parcours critiques ont été testés avant soutenance. \\
+\hline
+\end{tabularx}
+\caption{Roadmap DressMe -- approche progressive mock-first puis intégration backend}
+\end{table}

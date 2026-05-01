@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "DressMe",
+    "slug": "dressme",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "assetBundlePatterns": ["**/*"],
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

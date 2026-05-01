@@ -1,0 +1,204 @@
+DressMe_Chat - Phase Authentication
+===================================
+
+Emplacement corrige
+-------------------
+Les changements de cette phase ont ete appliques dans le vrai projet:
+
+/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat
+
+
+Objectif
+--------
+Remplacer le mock auth du backend FastAPI par une authentification reelle:
+- inscription email
+- verification email
+- login email/password
+- reset password par email
+- login telephone par OTP
+- JWT stateless
+- endpoint current user /auth/me
+
+
+Fichiers crees
+--------------
+
+1. backend/app/db/__init__.py
+   - Package DB pour le backend.
+
+2. backend/app/db/session.py
+   - Engine SQLAlchemy async avec asyncpg.
+   - AsyncSessionLocal.
+   - Dependency get_db.
+   - init_db pour creer les tables au demarrage si active.
+
+3. backend/app/core/security.py
+   - Hash bcrypt des mots de passe.
+   - Verification bcrypt.
+   - Creation JWT avec python-jose.
+   - Decodage JWT.
+   - Payload JWT avec sub, user_id, iat, exp.
+
+4. backend/app/schemas/auth.py
+   - Schemas Pydantic pour:
+     RegisterRequest, LoginRequest, VerifyEmailRequest,
+     ForgotPasswordRequest, ResetPasswordRequest,
+     SendOTPRequest, VerifyOTPRequest.
+   - Reponses:
+     MessageResponse, UserResponse, TokenResponse.
+
+5. backend/app/modules/auth/service.py
+   - Toute la logique metier auth.
+   - Registration email.
+   - Login email/password.
+   - Verification email.
+   - Forgot/reset password.
+   - Send/verify OTP.
+   - get_current_user pour les routes protegees.
+
+6. backend/app/modules/auth/email_service.py
+   - Service SMTP reutilisable.
+   - Email de verification.
+   - Email de reset password.
+   - Templates HTML simples.
+
+7. backend/app/modules/auth/sms_service.py
+   - Service SMS mock.
+   - Structure remplaçable par Twilio plus tard.
+   - Log console du code OTP en developpement.
+
+
+Fichiers modifies
+-----------------
+
+1. backend/app/core/config.py
+   - Ajout de la configuration auth/JWT.
+   - Ajout SMTP.
+   - Ajout OTP expiration.
+   - Ajout reset/verification token expiration.
+   - Ajout CORS.
+   - Ajout AUTO_CREATE_TABLES.
+
+2. backend/app/main.py
+   - Ajout du middleware CORS.
+   - Ajout du startup hook pour init_db.
+
+3. backend/app/models/user.py
+   - Remplacement du modele User minimal par un modele auth complet.
+   - Champs:
+     id, first_name, last_name, email, phone_number, password_hash,
+     is_verified, otp_code, otp_expiration, reset_token,
+     reset_token_expiration, verification_token,
+     verification_token_expiration, avatar_url, bio, created_at, updated_at.
+
+4. backend/app/models/__init__.py
+   - Export des modeles User, Post, PostMedia.
+
+5. backend/app/modules/auth/router.py
+   - Suppression de l'ancien mock auth.
+   - Ajout des vrais endpoints:
+     POST /api/v1/auth/register
+     POST /api/v1/auth/login
+     GET /api/v1/auth/verify-email
+     POST /api/v1/auth/verify-email
+     POST /api/v1/auth/forgot-password
+     POST /api/v1/auth/reset-password
+     POST /api/v1/auth/send-otp
+     POST /api/v1/auth/verify-otp
+     GET /api/v1/auth/me
+
+6. .env.example
+   - Ajout des variables JWT, SMTP, OTP, reset password,
+     verification email, CORS, API_BASE_URL, FRONTEND_URL.
+
+
+Fonctionnalites implementees
+----------------------------
+
+1. Registration email
+   - first_name, last_name, email, password.
+   - Email unique.
+   - Password min 8 caracteres.
+   - Password hash avec bcrypt.
+   - Compte cree avec is_verified=false.
+   - Token de verification securise.
+   - Token stocke en hash SHA-256 en base.
+   - Email de verification envoye via SMTP.
+
+2. Login email/password
+   - Validation credentials.
+   - Refus si email/password invalide.
+   - Refus si email non verifie.
+   - Retour JWT access_token.
+
+3. Verification email
+   - Endpoint GET et POST.
+   - Token expire configurable.
+   - Activation du compte.
+   - Nettoyage du token apres usage.
+
+4. Forgot/reset password
+   - Forgot password ne revele pas si l'email existe.
+   - Token reset securise.
+   - Token reset stocke en hash SHA-256.
+   - Expiration configurable.
+   - Nouveau password hash avec bcrypt.
+   - Nettoyage du token apres reset.
+
+5. OTP telephone
+   - phone_number unique.
+   - Creation utilisateur telephone si necessaire.
+   - OTP numerique.
+   - OTP expire apres 5 minutes par defaut.
+   - OTP stocke hashe avec bcrypt.
+   - Verification OTP.
+   - Retour JWT apres verification.
+
+6. JWT security
+   - Secret depuis BACKEND_SECRET_KEY ou JWT_SECRET_KEY.
+   - Algorithm configurable.
+   - Expiration configurable.
+   - Dependency get_current_user.
+
+7. Current user
+   - GET /api/v1/auth/me.
+   - Lecture du Bearer token.
+   - Retour du profil utilisateur courant.
+
+
+Validation executee
+-------------------
+
+1. Syntaxe Python:
+   python3 -m compileall -q backend/app
+
+   Resultat: OK.
+
+2. Import FastAPI app depuis la racine du projet:
+   .venv/bin/python -B -c 'import sys; sys.path.insert(0, "backend"); import app.main; print("import ok")'
+
+   Resultat: import ok.
+
+
+Commandes de lancement
+----------------------
+
+Depuis la racine du projet:
+
+docker compose -f infra/docker-compose.yml up --build
+
+Ou en local:
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ./backend
+uvicorn app.main:app --reload --app-dir backend
+
+
+Notes
+-----
+- Pour recevoir les emails en dev, utiliser Mailpit/MailHog sur localhost:1025
+  ou configurer Mailtrap/Gmail dans .env.
+- Le SMS est volontairement mock pour le moment, mais le service est isole pour
+  pouvoir brancher Twilio sans toucher au router.
+- Les changements faits auparavant dans le mauvais dossier n'ont pas ete supprimes.
