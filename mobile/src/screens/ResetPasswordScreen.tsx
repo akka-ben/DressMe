@@ -10,26 +10,46 @@ import { colors, radius } from "../theme/dressme";
 
 
 type Props = {
+  token: string;
   onBackToLogin?: () => void;
+  onResetSuccess?: () => void;
 };
 
 
-export function ForgotPasswordScreen({ onBackToLogin }: Props) {
-  const [email, setEmail] = useState("mohammed@example.com");
+export function ResetPasswordScreen({ token, onBackToLogin, onResetSuccess }: Props) {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("Enter your email to receive a reset link.");
+  const [message, setMessage] = useState("Choose a new password for your DressMe account.");
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert("Missing email", "Enter your email address.");
+  const handleResetPassword = async () => {
+    if (!token) {
+      Alert.alert("Invalid link", "Password reset token is missing.");
+      return;
+    }
+
+    if (!password || !confirmPassword) {
+      Alert.alert("Missing fields", "Enter and confirm your new password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert("Invalid password", "Password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Password mismatch", "Both passwords must match.");
       return;
     }
 
     try {
       setLoading(true);
-      const response = await client.forgotPassword(email.trim().toLowerCase());
+      const response = await client.resetPassword(token, password);
       setMessage(response.message);
-      Alert.alert("Reset link", response.message);
+      Alert.alert("Password reset", response.message, [
+        { text: "Back to Login", onPress: () => onResetSuccess?.() },
+      ]);
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -38,7 +58,7 @@ export function ForgotPasswordScreen({ onBackToLogin }: Props) {
             ? error.message
             : "Network error. Check your backend URL and connection.";
       setMessage(message);
-      Alert.alert("Request failed", message);
+      Alert.alert("Reset failed", message);
     } finally {
       setLoading(false);
     }
@@ -46,21 +66,29 @@ export function ForgotPasswordScreen({ onBackToLogin }: Props) {
 
   return (
     <LinearGradient colors={[colors.cream, colors.beige]} style={styles.wrap}>
-    <SectionCard title="Mot de passe oublié" subtitle="Recevez un lien sécurisé pour définir un nouveau mot de passe.">
+    <SectionCard title="Nouveau mot de passe" subtitle="Sécurisez votre compte DressMe.">
       <TextInput
         autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        onChangeText={setEmail}
-        placeholder="Email"
+        onChangeText={setPassword}
+        placeholder="Nouveau mot de passe"
         placeholderTextColor={colors.muted}
+        secureTextEntry
         style={styles.input}
-        value={email}
+        value={password}
+      />
+      <TextInput
+        autoCapitalize="none"
+        onChangeText={setConfirmPassword}
+        placeholder="Confirmer le mot de passe"
+        placeholderTextColor={colors.muted}
+        secureTextEntry
+        style={styles.input}
+        value={confirmPassword}
       />
       <PrimaryButton
         disabled={loading}
-        label={loading ? "Envoi..." : "Envoyer le lien"}
-        onPress={handleForgotPassword}
+        label={loading ? "Réinitialisation..." : "Réinitialiser"}
+        onPress={handleResetPassword}
       />
       <PrimaryButton label="Retour connexion" variant="secondary" onPress={() => onBackToLogin?.()} />
       {loading ? <ActivityIndicator color={colors.burgundy} /> : null}

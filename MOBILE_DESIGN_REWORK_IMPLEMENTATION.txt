@@ -1,0 +1,189 @@
+DressMe_Chat - Phase Design Frontend Mobile
+===========================================
+
+Projet cible
+------------
+/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat
+
+
+Objectif
+--------
+Refondre le design mobile DressMe selon une direction premium fashion:
+- palette burgundy / creme / or
+- ambiance editorial magazine
+- navigation bottom tab 5 onglets
+- feed social type Instagram
+- messagerie type WhatsApp
+- assistant IA stylist
+- profil, recherche, creation de post, notifications, stories
+
+L'architecture globale du projet n'a pas ete remplacee:
+- App.tsx reste le shell principal
+- les screens existants restent dans mobile/src/screens
+- l'auth backend existante est conservee
+- les donnees fashion sont mockees cote frontend pour la demo design
+
+
+Dependances ajoutees
+--------------------
+
+1. lucide-react-native
+   - Icônes modernes pour navigation, actions, messages, IA, notifications.
+
+2. expo-linear-gradient
+   - Degrades creme/burgundy.
+   - Story rings.
+   - Overlays story viewer.
+
+
+Fichiers crees
+--------------
+
+1. mobile/src/theme/dressme.ts
+   - Design system local:
+     couleurs
+     typographies systeme proches de Playfair/Inter
+     radius
+     shadows
+
+2. mobile/src/data/fashionData.ts
+   - Donnees mock mode:
+     utilisateurs
+     posts
+     stories
+     conversations
+     notifications
+     suggestions IA
+
+3. mobile/src/screens/SearchScreen.tsx
+   - Ecran Recherche.
+   - Barre de recherche.
+   - Grille 3 colonnes de looks.
+
+4. mobile/src/screens/MessagesScreen.tsx
+   - Liste conversations.
+   - Vue conversation.
+   - Bulles envoyees/reçues.
+   - Mock appel audio/video.
+
+5. mobile/assets/dressme-splash.gif
+   - Copie locale du GIF splash pour bundling Expo.
+
+
+Fichiers modifies
+-----------------
+
+1. mobile/App.tsx
+   - Cadre mobile type iPhone 390x844.
+   - Frame noire avec notch.
+   - Splash screen 3,5 secondes.
+   - Navigation 5 onglets.
+   - Suppression de l'ancien header generique.
+   - Conservation de l'auth backend et reset password links.
+
+2. mobile/src/components/TabBar.tsx
+   - Passage de 3 onglets a 5:
+     Feed
+     Recherche
+     Publier
+     Messages
+     Profil
+   - Icônes Lucide.
+   - Badge messages non-lus.
+
+3. mobile/src/components/PrimaryButton.tsx
+   - Variants:
+     primary
+     secondary
+     ghost
+   - Couleurs burgundy/creme.
+   - Etat disabled.
+
+4. mobile/src/components/SectionCard.tsx
+   - Style premium:
+     border radius
+     shadow douce
+     typographie editorial
+     bordures beige
+
+5. mobile/src/screens/OnboardingScreen.tsx
+   - Hero image mode.
+   - Badge AI Stylist.
+   - Logo DressMe editorial.
+   - CTA premium.
+
+6. mobile/src/screens/LoginScreen.tsx
+   - Nouveau design auth.
+   - Toggle Connexion / Inscription.
+   - Card blanche.
+   - Inputs avec icônes.
+   - Auth backend conservee.
+
+7. mobile/src/screens/RegisterScreen.tsx
+   - Nouveau design inscription.
+   - Zone photo de profil optionnelle.
+   - Inputs stylises.
+   - Auth backend conservee.
+
+8. mobile/src/screens/ForgotPasswordScreen.tsx
+   - Nouveau style.
+   - Reset email backend conserve.
+
+9. mobile/src/screens/ResetPasswordScreen.tsx
+   - Nouveau style.
+   - Reset password backend conserve.
+
+10. mobile/src/screens/FeedScreen.tsx
+    - Refonte complete:
+      header DressMe
+      bouton IA Stylist
+      notifications
+      stories horizontales
+      filtres hashtags
+      post cards premium
+      likes/saves
+      sondage Help Me Choose
+      story viewer fullscreen
+      modal notifications
+      modal DressMe Stylist avec suggestions et chat mock
+
+11. mobile/src/screens/CreatePostScreen.tsx
+    - Refonte creation post:
+      upload photo mock
+      input URL
+      description
+      hashtags
+      cards options avancees
+      CTA publier
+
+12. mobile/src/screens/ProfileScreen.tsx
+    - Refonte profil:
+      avatar
+      stats
+      badge verifie
+      bio
+      onglets publications/sauvegardes/tagues
+      grille posts
+
+
+Validation
+----------
+Commande executee:
+
+cd mobile
+npm run typecheck
+
+Resultat:
+- TypeScript OK.
+
+
+Pour tester
+-----------
+
+cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat/mobile"
+npx expo start -c
+
+Notes:
+- L'auth continue d'utiliser le backend reel.
+- Les ecrans sociaux/design utilisent des donnees mockees pour presenter un prototype demo-ready.
+- Si Expo etait deja lance, il faut relancer avec -c pour vider le cache.

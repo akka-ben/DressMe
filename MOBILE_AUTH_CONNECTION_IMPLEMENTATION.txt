@@ -1,0 +1,249 @@
+DressMe_Chat - Section Mobile Auth Connection
+=============================================
+
+Date : 1 May 2026 - 14:58 
+
+Projet cible
+------------
+/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat
+
+
+Objectif de cette section
+-------------------------
+Connecter le frontend mobile React Native / Expo a la vraie authentification
+FastAPI deja implementee dans le backend DressMe.
+
+But fonctionnel:
+- remplacer le login/register mock par de vrais appels API
+- sauvegarder le JWT localement
+- restaurer automatiquement la session au lancement de l'app
+- appeler /auth/me avec le Bearer token
+- afficher le Feed apres authentification
+
+
+Fichiers crees
+--------------
+
+1. mobile/src/context/AuthContext.tsx
+   - Ajout d'un React Context pour l'etat d'authentification.
+   - Etat gere:
+     isLoading
+     isAuthenticated
+     user
+     token
+   - Fonctions exposees:
+     login(email, password)
+     register(input)
+     logout()
+   - Integration AsyncStorage avec la cle:
+     dressme.accessToken
+   - Auto-login au demarrage:
+     lecture du token stocke
+     appel a /auth/me
+     suppression du token si invalide
+
+2. mobile/.env.example
+   - Ajout d'un exemple de configuration mobile:
+     EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
+
+3. mobile/src/screens/ResetPasswordScreen.tsx
+   - Ecran permettant de saisir un nouveau mot de passe.
+   - Validation:
+     token present
+     password min 8 caracteres
+     confirmation identique
+   - Appel au backend:
+     POST /auth/reset-password
+   - Retour vers Login apres reset reussi.
+
+
+Fichiers modifies
+-----------------
+
+1. mobile/src/services/api/apiClient.ts
+   - Remplacement des appels mock par un vrai client API fetch.
+   - Base URL configurable avec:
+     EXPO_PUBLIC_API_URL
+   - Fallback actuel:
+     http://192.168.0.197:8000/api/v1
+   - Endpoints implementes:
+     POST /auth/login
+     POST /auth/register
+     POST /auth/forgot-password
+     POST /auth/reset-password
+     GET /auth/me
+   - Ajout du header:
+     Authorization: Bearer <token>
+   - Ajout de ApiError pour remonter les erreurs backend.
+   - Mapping des reponses backend snake_case vers les types frontend camelCase.
+   - Mapping ajoute aussi pour feed/profile/comments/AI afin que le client reel
+     ne casse pas les ecrans existants.
+
+2. mobile/src/services/index.ts
+   - Suppression du choix mock force.
+   - Export du client reel:
+     new ApiDressMeClient(API_URL)
+
+3. mobile/src/services/types.ts
+   - Mise a jour de l'interface DressMeClient.
+   - Ajout de:
+     getMe(token)
+     forgotPassword(email)
+   - Register retourne maintenant AuthMessage au lieu d'une session mock.
+
+4. mobile/src/types/contracts.ts
+   - Mise a jour du type AuthSession pour correspondre au backend:
+     accessToken
+     tokenType
+     expiresAt
+     expiresIn
+     user
+   - Ajout de AuthMessage.
+
+5. mobile/src/screens/LoginScreen.tsx
+   - Suppression du login automatique mock au montage.
+   - Champs email/password rendus editables.
+   - Appel au vrai login via AuthContext.
+   - Sauvegarde du token via AuthContext.
+   - Appel indirect a /auth/me apres login.
+   - Gestion des erreurs:
+     champs vides
+     mauvais credentials
+     erreur reseau
+   - Navigation vers le Feed via onLoginSuccess.
+
+6. mobile/src/screens/RegisterScreen.tsx
+   - Suppression du register mock.
+   - Champs rendus editables:
+     first name
+     last name
+     email
+     password
+   - Appel au vrai endpoint /auth/register.
+   - Message de succes indiquant de verifier l'email.
+   - Gestion validation frontend:
+     champs vides
+     mot de passe min 8 caracteres
+   - Gestion erreurs backend/reseau.
+
+7. mobile/src/screens/ForgotPasswordScreen.tsx
+   - Remplacement du bouton mock par un vrai appel:
+     POST /auth/forgot-password
+   - Champ email editable.
+   - Gestion loading, succes et erreurs.
+
+8. mobile/App.tsx
+   - Ajout de AuthProvider autour de l'application.
+   - Remplacement de l'etat local authenticated par useAuth().
+   - Auto-login via AuthContext au demarrage.
+   - Affichage loading pendant la restauration de session.
+   - Logout supprime le token AsyncStorage.
+   - L'app affiche directement le Feed si le token stocke est valide.
+   - Lecture des liens reset password avec Linking.
+   - Extraction de token depuis:
+     /reset-password?token=...
+   - Affichage direct de ResetPasswordScreen quand le lien email est ouvert.
+
+9. mobile/src/components/PrimaryButton.tsx
+   - Ajout de la prop disabled.
+   - Style disabled sans changer le design global.
+   - Utilise pour eviter les doubles clics pendant login/register/reset.
+
+10. mobile/src/services/mock/mockClient.ts
+    - Les methodes auth mock lancent maintenant une erreur explicite.
+    - Objectif: eviter de continuer a utiliser le mock auth par erreur.
+
+11. mobile/src/services/mock/mockData.ts
+    - Suppression de mockSession car l'auth ne doit plus utiliser de session mock.
+
+12. mobile/package.json
+    - Ajout de la dependance:
+      @react-native-async-storage/async-storage
+
+13. mobile/package-lock.json
+    - Mis a jour automatiquement par npm install.
+
+14. .env.example
+    - Ajout de:
+      EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
+
+15. mobile/.env
+    - Ajout de l'URL backend locale effective:
+      EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
+
+
+Dependance installee
+--------------------
+Commande executee:
+
+npm install @react-native-async-storage/async-storage
+
+Note:
+- Le premier essai a echoue a cause d'un blocage reseau sandbox.
+- La commande a ensuite ete relancee avec autorisation reseau et a reussi.
+
+
+Validation executee
+-------------------
+Commande executee:
+
+cd mobile
+npm run typecheck
+
+Resultat:
+- TypeScript OK.
+- Aucun type error apres corrections.
+
+
+Flux final implemente
+---------------------
+
+1. L'utilisateur ouvre l'app.
+2. AuthContext cherche un token dans AsyncStorage.
+3. Si token trouve:
+   - appel GET /auth/me avec Bearer token
+   - si valide, l'utilisateur arrive directement sur le Feed
+   - si invalide, token supprime et retour auth flow
+4. Si aucun token:
+   - affichage onboarding/login
+5. Login:
+   - POST /auth/login
+   - recuperation access_token
+   - GET /auth/me
+   - stockage token
+   - navigation Feed
+6. Register:
+   - POST /auth/register
+   - message demandant de verifier l'email
+   - retour possible vers login
+7. Logout:
+   - suppression du token
+   - retour au flow non authentifie
+8. Forgot password:
+   - demande de reset via email
+   - reception du lien /reset-password?token=...
+   - ouverture directe de l'ecran Reset Password
+   - changement du mot de passe via /auth/reset-password
+
+
+Configuration importante
+------------------------
+Ne pas utiliser localhost sur telephone physique.
+
+Utiliser l'IP locale de la machine backend:
+
+EXPO_PUBLIC_API_URL=http://192.168.0.197:8000/api/v1
+
+Si l'IP change, mettre a jour:
+- mobile/.env
+ou
+- mobile/.env.example
+ou lancer Expo avec la variable EXPO_PUBLIC_API_URL correcte.
+
+
+Remarques
+---------
+- Le design UI n'a pas ete redesigne.
+- Les changements sont limites a la logique d'authentification et a la connexion API.
+- Les autres mocks non-auth peuvent encore exister dans certains ecrans, mais le mock
+  authentication a ete retire du flux principal.

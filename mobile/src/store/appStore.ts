@@ -6,6 +6,6 @@ type AppState = {
 };
 
 export const useAppStore = create<AppState>((set) => ({
-  useMocks: true,
+  useMocks: false,
   setUseMocks: (value) => set({ useMocks: value }),
 }));

@@ -19,7 +19,7 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    if settings.auto_create_tables:
+    if settings.auto_create_indexes:
         await init_db()
 
 

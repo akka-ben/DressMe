@@ -1,4 +1,4 @@
-from app.models.post import Post, PostMedia
-from app.models.user import User
+from app.models.post import POSTS_COLLECTION, PostDocument
+from app.models.user import USERS_COLLECTION, UserDocument
 
-__all__ = ["Post", "PostMedia", "User"]
+__all__ = ["POSTS_COLLECTION", "PostDocument", "USERS_COLLECTION", "UserDocument"]
