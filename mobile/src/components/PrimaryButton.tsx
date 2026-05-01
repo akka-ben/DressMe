@@ -1,26 +1,38 @@
 import React from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+
+import { colors, fonts, radius, shadow } from "../theme/dressme";
 
 
 type Props = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  variant?: "primary" | "secondary" | "ghost";
+  style?: ViewStyle;
 };
 
 
-export function PrimaryButton({ label, onPress, disabled = false }: Props) {
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled = false,
+  variant = "primary",
+  style,
+}: Props) {
   return (
     <Pressable
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        styles[variant],
         pressed && styles.buttonPressed,
         disabled && styles.buttonDisabled,
+        style,
       ]}
     >
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, variant !== "primary" && styles.secondaryLabel]}>{label}</Text>
     </Pressable>
   );
 }
@@ -28,12 +40,26 @@ export function PrimaryButton({ label, onPress, disabled = false }: Props) {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: "#8f4d32",
-    borderRadius: 14,
+    borderRadius: radius.md,
     paddingHorizontal: 16,
     paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 46,
+  },
+  primary: {
+    backgroundColor: colors.burgundy,
+    ...shadow.button,
+  },
+  secondary: {
+    backgroundColor: colors.beige,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ghost: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   buttonPressed: {
     opacity: 0.88,
@@ -42,8 +68,12 @@ const styles = StyleSheet.create({
     opacity: 0.56,
   },
   label: {
-    color: "#fffaf5",
+    color: colors.cream,
     fontSize: 14,
     fontWeight: "700",
+    fontFamily: fonts.body,
+  },
+  secondaryLabel: {
+    color: colors.burgundy,
   },
 });

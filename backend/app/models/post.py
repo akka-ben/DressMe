@@ -1,20 +1,14 @@
-from sqlalchemy import ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.models.base import Base
+from typing import TypedDict
 
 
-class Post(Base):
-    __tablename__ = "posts"
+class PostDocument(TypedDict, total=False):
+    _id: str
+    id: str
+    author_id: str
+    caption: str
+    image_urls: list[str]
+    hashtags: list[str]
+    created_at: str
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    author_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    caption: Mapped[str] = mapped_column(Text)
 
-
-class PostMedia(Base):
-    __tablename__ = "post_media"
-
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    post_id: Mapped[str] = mapped_column(ForeignKey("posts.id"), index=True)
-    url: Mapped[str] = mapped_column(String(500))
+POSTS_COLLECTION = "posts"

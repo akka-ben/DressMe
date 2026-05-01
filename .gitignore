@@ -1,19 +1,77 @@
-# macOS
+# ========================
+# OS
+# ========================
 .DS_Store
 
-# Python
+# ========================
+# ENV FILES (IMPORTANT)
+# ========================
+.env
+.env.*
+!.env.example
+
+# ========================
+# PYTHON
+# ========================
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 .pytest_cache/
 .venv/
+venv/
+env/
 
-# Node
+# ========================
+# FASTAPI / BUILD
+# ========================
+*.log
+
+# ========================
+# NODE / REACT NATIVE
+# ========================
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo
+.expo/
+.expo-shared/
+
+# Build
 dist/
 build/
+web-build/
 
-# React Native
+# ========================
+# ANDROID / IOS
+# ========================
 android/app/build/
+android/.gradle/
 ios/build/
+ios/Pods/
 
-# Environment
-.env
+# ========================
+# TYPESCRIPT
+# ========================
+*.tsbuildinfo
+
+# ========================
+# DOCKER
+# ========================
+docker-data/
+*.db
+
+# ========================
+# DATABASE FILES (SI SQLITE)
+# ========================
+*.sqlite3
+*.db
+
+# ========================
+# IDE
+# ========================
+.vscode/
+.idea/
+*.iml

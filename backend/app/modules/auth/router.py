@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.db.session import get_db
-from app.models.user import User
 from app.modules.auth import service
 from app.schemas.auth import (
     ForgotPasswordRequest,
@@ -27,7 +26,7 @@ router = APIRouter()
 )
 async def register(
     payload: RegisterRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> MessageResponse:
     await service.register_user(db, payload)
     return MessageResponse(
@@ -38,7 +37,7 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: LoginRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> TokenResponse:
     return await service.login_with_email(db, payload)
 
@@ -46,7 +45,7 @@ async def login(
 @router.get("/verify-email", response_model=MessageResponse)
 async def verify_email_from_link(
     token: str = Query(..., min_length=20, max_length=255),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> MessageResponse:
     await service.verify_email_token(db, token)
     return MessageResponse(message="Email verified successfully.")
@@ -55,7 +54,7 @@ async def verify_email_from_link(
 @router.post("/verify-email", response_model=MessageResponse)
 async def verify_email(
     payload: VerifyEmailRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> MessageResponse:
     await service.verify_email_token(db, payload.token)
     return MessageResponse(message="Email verified successfully.")
@@ -64,7 +63,7 @@ async def verify_email(
 @router.post("/forgot-password", response_model=MessageResponse)
 async def forgot_password(
     payload: ForgotPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> MessageResponse:
     await service.forgot_password(db, payload)
     return MessageResponse(
@@ -75,7 +74,7 @@ async def forgot_password(
 @router.post("/reset-password", response_model=MessageResponse)
 async def reset_password(
     payload: ResetPasswordRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> MessageResponse:
     await service.reset_password(db, payload)
     return MessageResponse(message="Password has been reset successfully.")
@@ -84,7 +83,7 @@ async def reset_password(
 @router.post("/send-otp", response_model=MessageResponse)
 async def send_otp(
     payload: SendOTPRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> MessageResponse:
     await service.send_otp(db, payload)
     return MessageResponse(message="OTP code sent.")
@@ -93,11 +92,11 @@ async def send_otp(
 @router.post("/verify-otp", response_model=TokenResponse)
 async def verify_otp(
     payload: VerifyOTPRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> TokenResponse:
     return await service.verify_otp(db, payload)
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(current_user: User = Depends(service.get_current_user)) -> User:
+async def me(current_user: service.UserDocument = Depends(service.get_current_user)) -> service.UserDocument:
     return current_user

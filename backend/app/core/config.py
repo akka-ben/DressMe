@@ -27,12 +27,17 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = Field(
         default=7, alias="BACKEND_REFRESH_TOKEN_EXPIRE_DAYS"
     )
-    database_url: str = Field(alias="DATABASE_URL")
+    mongodb_url: str = Field(default="mongodb://localhost:27017", alias="MONGODB_URL")
+    mongodb_db_name: str = Field(default="dressme", alias="MONGODB_DB_NAME")
     redis_url: str = Field(alias="REDIS_URL")
 
-    auto_create_tables: bool = Field(
+    auto_create_indexes: bool = Field(
         default=True,
-        validation_alias=AliasChoices("BACKEND_AUTO_CREATE_TABLES", "AUTO_CREATE_TABLES"),
+        validation_alias=AliasChoices(
+            "BACKEND_AUTO_CREATE_INDEXES",
+            "BACKEND_AUTO_CREATE_TABLES",
+            "AUTO_CREATE_TABLES",
+        ),
     )
     api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
     api_base_url: str = Field(default="http://localhost:8000", alias="API_BASE_URL")

@@ -17,6 +17,7 @@ export interface DressMeClient {
     password: string;
   }): Promise<AuthMessage>;
   forgotPassword(email: string): Promise<AuthMessage>;
+  resetPassword(token: string, newPassword: string): Promise<AuthMessage>;
   getMe(token: string): Promise<User>;
   getFeed(): Promise<Post[]>;
   getPostComments(postId: string): Promise<Comment[]>;

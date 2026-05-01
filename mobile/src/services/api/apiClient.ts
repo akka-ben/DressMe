@@ -112,6 +112,7 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = "ApiError";
+    Object.setPrototypeOf(this, ApiError.prototype);
   }
 }
 
@@ -186,6 +187,13 @@ export class ApiDressMeClient implements DressMeClient {
     return this.request<BackendMessage>("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<AuthMessage> {
+    return this.request<BackendMessage>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password: newPassword }),
     });
   }
 

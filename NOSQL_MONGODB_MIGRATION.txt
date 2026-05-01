@@ -1,0 +1,109 @@
+DressMe_Chat - Migration NoSQL MongoDB
+======================================
+
+Contexte
+--------
+Le backend utilisait PostgreSQL + SQLAlchemy pour l'authentification.
+Cette phase migre la persistance auth vers MongoDB, une base NoSQL document.
+
+
+Choix technique
+---------------
+- Base NoSQL: MongoDB
+- Driver async: Motor
+- Collection principale: users
+- Les routes API restent identiques:
+  POST /api/v1/auth/register
+  POST /api/v1/auth/login
+  GET /api/v1/auth/me
+  GET/POST /api/v1/auth/verify-email
+  POST /api/v1/auth/forgot-password
+  POST /api/v1/auth/reset-password
+  POST /api/v1/auth/send-otp
+  POST /api/v1/auth/verify-otp
+
+
+Fichiers modifies
+-----------------
+
+1. backend/app/core/config.py
+   - Ajout de:
+     MONGODB_URL
+     MONGODB_DB_NAME
+   - Suppression de DATABASE_URL cote configuration applicative.
+   - Remplacement logique de AUTO_CREATE_TABLES par AUTO_CREATE_INDEXES.
+
+2. backend/app/db/session.py
+   - Remplacement de la session SQLAlchemy par Motor.
+   - Creation du client MongoDB async.
+   - Dependency get_db retourne une AsyncIOMotorDatabase.
+   - init_db cree les indexes MongoDB:
+     users_email_unique
+     users_phone_unique
+     users_verification_token_unique
+     users_reset_token_unique
+   - Les indexes utilisent partialFilterExpression sur les valeurs string
+     pour eviter les conflits avec les champs optionnels null.
+   - Nettoyage automatique des anciens indexes legacy sur les memes champs.
+
+3. backend/app/modules/auth/service.py
+   - Refonte complete du service auth pour MongoDB.
+   - Suppression des requetes SQLAlchemy.
+   - Utilisation de db.users.find_one, insert_one, update_one.
+   - Conservation de bcrypt, JWT, verification email, reset password et OTP.
+
+4. backend/app/modules/auth/router.py
+   - Dependency DB mise a jour vers AsyncIOMotorDatabase.
+   - Endpoints inchanges.
+
+5. backend/pyproject.toml
+   - Ajout de motor.
+   - Suppression de sqlalchemy, asyncpg, greenlet et alembic.
+
+6. infra/docker-compose.yml
+   - Ajout du service mongo.
+   - Ajout du volume mongo_data.
+   - Backend depend maintenant de mongo.
+   - Suppression du service postgres de la configuration actuelle.
+
+7. .env et .env.example
+   - Ajout:
+     MONGODB_URL
+     MONGODB_DB_NAME
+   - Suppression de DATABASE_URL.
+
+8. backend/app/models/*
+   - Suppression des anciens modeles SQLAlchemy.
+   - Remplacement par des types de documents MongoDB.
+
+
+Important
+---------
+L'authentification utilise MongoDB. Les anciens comptes crees dans PostgreSQL
+ne sont pas automatiquement disponibles dans MongoDB: il faut soit recreer
+les comptes en developpement, soit ecrire un script de migration si tu veux
+conserver les anciens utilisateurs.
+
+Pour lancer MongoDB:
+
+docker compose -f infra/docker-compose.yml up -d mongo redis minio
+
+Pour lancer le backend local:
+
+source .venv/bin/activate
+pip install -e ./backend
+uvicorn app.main:app --reload --app-dir backend --host 0.0.0.0 --port 8000
+
+Verification rapide:
+
+curl http://127.0.0.1:8000/health
+
+curl -i -X POST http://127.0.0.1:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"first_name":"Test","last_name":"Mongo","email":"testmongo@mail.com","password":"password123"}'
+
+Apres verification email via Mailpit, tester le login:
+
+curl -i -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"testmongo@mail.com","password":"password123"}'

@@ -1,6 +1,8 @@
 import React, { PropsWithChildren } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { colors, fonts, radius, shadow } from "../theme/dressme";
+
 
 type Props = PropsWithChildren<{
   title: string;
@@ -21,21 +23,24 @@ export function SectionCard({ title, subtitle, children }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
     padding: 16,
     gap: 10,
     borderWidth: 1,
-    borderColor: "#eadfd5",
+    borderColor: colors.border,
+    ...shadow.card,
   },
   title: {
-    fontSize: 18,
+    fontSize: 21,
     fontWeight: "700",
-    color: "#1f1a17",
+    color: colors.text,
+    fontFamily: fonts.display,
   },
   subtitle: {
     fontSize: 13,
-    color: "#6d635c",
+    color: colors.muted,
+    fontFamily: fonts.body,
   },
   body: {
     gap: 8,

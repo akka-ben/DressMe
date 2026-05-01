@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Linking,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -8,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { AppTab, TabBar } from "./src/components/TabBar";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
@@ -18,8 +21,14 @@ import { LoginScreen } from "./src/screens/LoginScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
+import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
+import { SearchScreen } from "./src/screens/SearchScreen";
+import { MessagesScreen } from "./src/screens/MessagesScreen";
+import { colors, fonts, radius } from "./src/theme/dressme";
 
-type AuthRoute = "onboarding" | "login" | "register" | "forgot";
+const splashGif = require("./assets/dressme-splash.gif");
+
+type AuthRoute = "onboarding" | "login" | "register" | "forgot" | "reset";
 
 export default function App() {
   return (
@@ -33,6 +42,31 @@ function AppShell() {
   const { isAuthenticated, isLoading, logout, user } = useAuth();
   const [authRoute, setAuthRoute] = useState<AuthRoute>("onboarding");
   const [activeTab, setActiveTab] = useState<AppTab>("feed");
+  const [lastRegisteredEmail, setLastRegisteredEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 3500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      const token = extractResetToken(url);
+      if (!token) {
+        return;
+      }
+
+      setResetToken(token);
+      setAuthRoute("reset");
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+
+    return () => subscription.remove();
+  }, []);
 
   const renderAuth = () => {
     switch (authRoute) {
@@ -41,6 +75,7 @@ function AppShell() {
       case "login":
         return (
           <LoginScreen
+            initialEmail={lastRegisteredEmail}
             onLoginSuccess={() => setActiveTab("feed")}
             onOpenRegister={() => setAuthRoute("register")}
             onOpenForgotPassword={() => setAuthRoute("forgot")}
@@ -49,12 +84,23 @@ function AppShell() {
       case "register":
         return (
           <RegisterScreen
-            onRegistered={() => setAuthRoute("login")}
+            onRegistered={(email) => {
+              setLastRegisteredEmail(email);
+              setAuthRoute("login");
+            }}
             onBackToLogin={() => setAuthRoute("login")}
           />
         );
       case "forgot":
         return <ForgotPasswordScreen onBackToLogin={() => setAuthRoute("login")} />;
+      case "reset":
+        return (
+          <ResetPasswordScreen
+            token={resetToken}
+            onBackToLogin={() => setAuthRoute("login")}
+            onResetSuccess={() => setAuthRoute("login")}
+          />
+        );
     }
   };
 
@@ -62,8 +108,12 @@ function AppShell() {
     switch (activeTab) {
       case "feed":
         return <FeedScreen />;
+      case "search":
+        return <SearchScreen />;
       case "create":
         return <CreatePostScreen />;
+      case "messages":
+        return <MessagesScreen />;
       case "profile":
         return <ProfileScreen />;
     }
@@ -72,114 +122,119 @@ function AppShell() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.container}>
+      <LinearGradient colors={["#E8E2D8", "#F0EBE3"]} style={styles.container}>
         <View style={styles.device}>
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.eyebrow}>DressMe</Text>
-              <Text style={styles.title}>
-                {isAuthenticated ? `Welcome${user?.firstName ? `, ${user.firstName}` : ""}` : "Welcome"}
-              </Text>
-              <Text style={styles.subtitle}>
-                {isAuthenticated
-                  ? "Authenticated with the DressMe backend."
-                  : "Use the onboarding and auth flow like a real mobile app."}
-              </Text>
+          {showSplash ? (
+            <View style={styles.splash}>
+              <Image source={splashGif} style={styles.splashImage} />
+              <Text style={styles.splashLogo}>DressMe</Text>
             </View>
-            {isAuthenticated ? (
-              <Text style={styles.badge} onPress={() => void logout()}>
-                Logout
-              </Text>
-            ) : null}
-          </View>
+          ) : (
+            <>
+              {isAuthenticated ? (
+                <Text style={styles.logout} onPress={() => void logout()}>
+                  Logout{user?.firstName ? ` · ${user.firstName}` : ""}
+                </Text>
+              ) : null}
 
-          <ScrollView
-            style={styles.screen}
-            contentContainerStyle={styles.screenContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {isLoading ? (
-              <View style={styles.loadingState}>
-                <ActivityIndicator color="#8f4d32" />
-              </View>
-            ) : isAuthenticated ? (
-              renderTab()
-            ) : (
-              renderAuth()
-            )}
-          </ScrollView>
+              <ScrollView
+                style={styles.screen}
+                contentContainerStyle={styles.screenContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {isLoading ? (
+                  <View style={styles.loadingState}>
+                    <ActivityIndicator color={colors.burgundy} />
+                  </View>
+                ) : isAuthenticated && authRoute !== "reset" ? (
+                  renderTab()
+                ) : (
+                  renderAuth()
+                )}
+              </ScrollView>
 
-          {isAuthenticated ? <TabBar activeTab={activeTab} onChange={setActiveTab} /> : null}
+              {isAuthenticated && authRoute !== "reset" ? (
+                <TabBar activeTab={activeTab} onChange={setActiveTab} />
+              ) : null}
+            </>
+          )}
         </View>
-      </View>
+      </LinearGradient>
     </SafeAreaView>
   );
+}
+
+function extractResetToken(url: string | null): string | null {
+  if (!url || !url.includes("reset-password")) {
+    return null;
+  }
+
+  const match = url.match(/[?&]token=([^&#]+)/);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return decodeURIComponent(match[1].replace(/\+/g, "%20"));
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#d9ccb9",
+    backgroundColor: "#E8E2D8",
   },
   container: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
+    padding: 0,
   },
   device: {
     width: "100%",
-    maxWidth: 430,
     height: "100%",
-    maxHeight: 920,
-    backgroundColor: "#f7f3ea",
-    borderRadius: 28,
+    backgroundColor: colors.cream,
+    borderRadius: 0,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#c9b9a6",
+  },
+  splash: {
+    flex: 1,
+    backgroundColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 22,
+  },
+  splashImage: {
+    width: 210,
+    height: 210,
+    resizeMode: "contain",
+  },
+  splashLogo: {
+    fontFamily: fonts.display,
+    color: colors.gold,
+    fontSize: 46,
+    fontWeight: "700",
+    letterSpacing: 1,
   },
   screen: {
     flex: 1,
+    backgroundColor: colors.cream,
   },
   screenContent: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  header: {
-    paddingHorizontal: 16,
+    padding: 12,
     paddingTop: 18,
-    paddingBottom: 14,
-    gap: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eadfd5",
-    backgroundColor: "#efe8dc",
+    paddingBottom: 20,
   },
-  eyebrow: {
-    color: "#8f4d32",
-    fontSize: 14,
-    fontWeight: "700",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  title: {
-    fontSize: 28,
+  logout: {
+    position: "absolute",
+    top: 14,
+    right: 18,
+    zIndex: 12,
+    color: colors.burgundy,
+    fontSize: 11,
     fontWeight: "800",
-    color: "#1f1a17",
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#5f554d",
-  },
-  badge: {
-    marginTop: 10,
-    alignSelf: "flex-start",
-    backgroundColor: "#8f4d32",
-    color: "#fffaf5",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.88)",
     borderRadius: 999,
-    fontWeight: "700",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     overflow: "hidden",
   },
   loadingState: {

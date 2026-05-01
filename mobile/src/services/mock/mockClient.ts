@@ -19,6 +19,10 @@ export class MockDressMeClient implements DressMeClient {
     throw new Error("Mock authentication is disabled. Use ApiDressMeClient.");
   }
 
+  async resetPassword(): Promise<AuthMessage> {
+    throw new Error("Mock authentication is disabled. Use ApiDressMeClient.");
+  }
+
   async getMe(): Promise<User> {
     throw new Error("Mock authentication is disabled. Use ApiDressMeClient.");
   }

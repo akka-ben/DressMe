@@ -1,5 +1,9 @@
-from sqlalchemy.orm import DeclarativeBase
+from datetime import datetime, timezone
+from typing import Any
 
 
-class Base(DeclarativeBase):
-    pass
+MongoDocument = dict[str, Any]
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)

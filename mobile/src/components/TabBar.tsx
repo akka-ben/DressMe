@@ -1,8 +1,10 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Home, PlusSquare, Search, Send, User } from "lucide-react-native";
 
+import { colors, fonts } from "../theme/dressme";
 
-export type AppTab = "feed" | "create" | "profile";
+export type AppTab = "feed" | "search" | "create" | "messages" | "profile";
 
 
 type Props = {
@@ -11,10 +13,12 @@ type Props = {
 };
 
 
-const tabs: Array<{ key: AppTab; label: string }> = [
-  { key: "feed", label: "Feed" },
-  { key: "create", label: "Create" },
-  { key: "profile", label: "Profile" },
+const tabs: Array<{ key: AppTab; label: string; Icon: typeof Home; badge?: number }> = [
+  { key: "feed", label: "Feed", Icon: Home },
+  { key: "search", label: "Recherche", Icon: Search },
+  { key: "create", label: "Publier", Icon: PlusSquare },
+  { key: "messages", label: "Messages", Icon: Send, badge: 3 },
+  { key: "profile", label: "Profil", Icon: User },
 ];
 
 
@@ -23,6 +27,7 @@ export function TabBar({ activeTab, onChange }: Props) {
     <View style={styles.container}>
       {tabs.map((tab) => {
         const active = tab.key === activeTab;
+        const Icon = tab.Icon;
 
         return (
           <Pressable
@@ -30,6 +35,10 @@ export function TabBar({ activeTab, onChange }: Props) {
             onPress={() => onChange(tab.key)}
             style={[styles.tab, active && styles.activeTab]}
           >
+            <View>
+              <Icon size={21} strokeWidth={2.1} color={active ? colors.burgundy : colors.muted} />
+              {tab.badge ? <View style={styles.badge} /> : null}
+            </View>
             <Text style={[styles.label, active && styles.activeLabel]}>{tab.label}</Text>
           </Pressable>
         );
@@ -42,29 +51,42 @@ export function TabBar({ activeTab, onChange }: Props) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    gap: 10,
-    padding: 12,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
     borderTopWidth: 1,
-    borderTopColor: "#eadfd5",
-    backgroundColor: "#fffaf5",
+    borderTopColor: colors.border,
+    backgroundColor: colors.white,
   },
   tab: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: "#efe6dc",
+    paddingVertical: 6,
+    gap: 3,
   },
   activeTab: {
-    backgroundColor: "#8f4d32",
+    backgroundColor: colors.cream,
+    borderRadius: 12,
   },
   label: {
-    color: "#6d635c",
-    fontWeight: "700",
-    fontSize: 13,
+    color: colors.muted,
+    fontWeight: "600",
+    fontSize: 10,
+    fontFamily: fonts.body,
   },
   activeLabel: {
-    color: "#fffaf5",
+    color: colors.burgundy,
+  },
+  badge: {
+    position: "absolute",
+    top: -3,
+    right: -6,
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: colors.burgundy,
+    borderWidth: 1,
+    borderColor: colors.white,
   },
 });
