@@ -1,4 +1,11 @@
-import { mockComments, mockPosts, mockProfile, mockRecommendations } from "./mockData";
+import {
+  mockComments,
+  mockConversations,
+  mockMessages,
+  mockPosts,
+  mockProfile,
+  mockRecommendations,
+} from "./mockData";
 import type { DressMeClient } from "../types";
 import type { AuthMessage, AuthSession, User } from "../../types/contracts";
 
@@ -40,6 +47,41 @@ export class MockDressMeClient implements DressMeClient {
   async getProfile() {
     await delay();
     return mockProfile;
+  }
+
+  async getChatUsers() {
+    await delay();
+    return mockConversations[0].participants;
+  }
+
+  async getConversations() {
+    await delay();
+    return mockConversations;
+  }
+
+  async startConversation() {
+    await delay();
+    return mockConversations[0];
+  }
+
+  async getConversationMessages() {
+    await delay();
+    return mockMessages;
+  }
+
+  async sendConversationMessage(
+    conversationId: string,
+    input: { body: string; kind?: "text" | "image" | "audio" },
+  ) {
+    await delay();
+    return {
+      id: `mock-${Date.now()}`,
+      conversationId,
+      sender: mockConversations[0].participants[0],
+      kind: input.kind ?? "text",
+      body: input.body,
+      createdAt: new Date().toISOString(),
+    };
   }
 
   async helpMeChoose() {

@@ -5,6 +5,21 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "DressMe utilise la camera pour envoyer des photos dans le chat.",
+        "NSMicrophoneUsageDescription": "DressMe utilise le micro pour enregistrer des messages vocaux.",
+        "NSPhotoLibraryUsageDescription": "DressMe utilise vos photos pour envoyer des images dans le chat."
+      }
+    },
+    "android": {
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
     "web": {
       "bundler": "metro"
     }

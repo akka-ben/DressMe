@@ -3,6 +3,8 @@ import type {
   AuthMessage,
   AuthSession,
   Comment,
+  Conversation,
+  Message,
   Post,
   Profile,
   User,
@@ -22,6 +24,14 @@ export interface DressMeClient {
   getFeed(): Promise<Post[]>;
   getPostComments(postId: string): Promise<Comment[]>;
   getProfile(userId: string): Promise<Profile>;
+  getChatUsers(): Promise<User[]>;
+  getConversations(): Promise<Conversation[]>;
+  startConversation(userId: string): Promise<Conversation>;
+  getConversationMessages(conversationId: string): Promise<Message[]>;
+  sendConversationMessage(
+    conversationId: string,
+    input: { body: string; kind?: "text" | "image" | "audio" },
+  ): Promise<Message>;
   helpMeChoose(input: {
     imageUrl: string;
     occasion?: string;

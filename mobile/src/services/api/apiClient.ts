@@ -5,6 +5,8 @@ import type {
   AuthMessage,
   AuthSession,
   Comment,
+  Conversation,
+  Message,
   Poll,
   PollOption,
   Post,
@@ -22,13 +24,12 @@ declare const process:
     }
   | undefined;
 
-const DEFAULT_API_URL = "http://192.168.0.197:8000/api/v1";
+const DEFAULT_API_URL = "http://192.168.11.127:8000/api/v1";
 
 export const API_URL =
   typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
     ? process.env.EXPO_PUBLIC_API_URL
     : DEFAULT_API_URL;
-
 type BackendUser = {
   id: string;
   first_name?: string | null;
@@ -102,6 +103,23 @@ type BackendAIRecommendation = {
   rationale: string;
   items: BackendAIRecommendationItem[];
   preview_image_url: string;
+};
+
+type BackendChatMessage = {
+  id: string;
+  conversation_id: string;
+  kind: "text" | "image" | "audio" | "shared_post" | "shared_ai_look";
+  body: string;
+  sender: BackendUser;
+  created_at: string;
+};
+
+type BackendConversation = {
+  id: string;
+  title: string;
+  participants: BackendUser[];
+  last_message?: BackendChatMessage | null;
+  unread_count?: number;
 };
 
 export class ApiError extends Error {
@@ -217,6 +235,48 @@ export class ApiDressMeClient implements DressMeClient {
     return mapProfile(profile);
   }
 
+  async getChatUsers(): Promise<User[]> {
+    const users = await this.request<BackendUser[]>("/chat/users");
+    return users.map(mapUser);
+  }
+
+  async getConversations(): Promise<Conversation[]> {
+    const conversations = await this.request<BackendConversation[]>("/chat/conversations");
+    return conversations.map(mapConversation);
+  }
+
+  async startConversation(userId: string): Promise<Conversation> {
+    const conversation = await this.request<BackendConversation>("/chat/conversations", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId }),
+    });
+    return mapConversation(conversation);
+  }
+
+  async getConversationMessages(conversationId: string): Promise<Message[]> {
+    const messages = await this.request<BackendChatMessage[]>(
+      `/chat/conversations/${conversationId}/messages`,
+    );
+    return messages.map(mapChatMessage);
+  }
+
+  async sendConversationMessage(
+    conversationId: string,
+    input: { body: string; kind?: "text" | "image" | "audio" },
+  ): Promise<Message> {
+    const message = await this.request<BackendChatMessage>(
+      `/chat/conversations/${conversationId}/messages`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          body: input.body,
+          kind: input.kind ?? "text",
+        }),
+      },
+    );
+    return mapChatMessage(message);
+  }
+
   async helpMeChoose(input: {
     imageUrl: string;
     occasion?: string;
@@ -329,5 +389,26 @@ function mapAIRecommendationItem(item: BackendAIRecommendationItem): AIRecommend
     category: item.category,
     description: item.description,
     color: item.color ?? undefined,
+  };
+}
+
+function mapChatMessage(message: BackendChatMessage): Message {
+  return {
+    id: message.id,
+    conversationId: message.conversation_id,
+    sender: mapUser(message.sender),
+    kind: message.kind,
+    body: message.body,
+    createdAt: message.created_at,
+  };
+}
+
+function mapConversation(conversation: BackendConversation): Conversation {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    participants: conversation.participants.map(mapUser),
+    lastMessage: conversation.last_message ? mapChatMessage(conversation.last_message) : undefined,
+    unreadCount: conversation.unread_count ?? 0,
   };
 }

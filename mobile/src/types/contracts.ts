@@ -51,7 +51,7 @@ export type Message = {
   id: string;
   conversationId: string;
   sender: User;
-  kind: "text" | "image" | "shared_post" | "shared_ai_look";
+  kind: "text" | "image" | "audio" | "shared_post" | "shared_ai_look";
   body: string;
   createdAt: string;
 };
@@ -61,6 +61,7 @@ export type Conversation = {
   title: string;
   participants: User[];
   lastMessage?: Message;
+  unreadCount: number;
 };
 
 export type CallSession = {

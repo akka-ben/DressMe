@@ -98,10 +98,19 @@ class HelpMeChooseInput(BaseModel):
 class MessageDTO(BaseModel):
     id: str
     conversation_id: str
-    kind: Literal["text", "image", "shared_post", "shared_ai_look"]
+    kind: Literal["text", "image", "audio", "shared_post", "shared_ai_look"]
     body: str
     sender: UserDTO
     created_at: datetime
+
+
+class SendMessageInput(BaseModel):
+    kind: Literal["text", "image", "audio"] = "text"
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
+class StartConversationInput(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=100)
 
 
 class ConversationDTO(BaseModel):
@@ -109,6 +118,7 @@ class ConversationDTO(BaseModel):
     title: str
     participants: list[UserDTO]
     last_message: MessageDTO | None = None
+    unread_count: int = 0
 
 
 class CallSessionDTO(BaseModel):
