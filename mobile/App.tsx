@@ -24,7 +24,7 @@ import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { MessagesScreen } from "./src/screens/MessagesScreen";
-import { colors, fonts, radius } from "./src/theme/dressme";
+import { colors } from "./src/theme/dressme";
 
 const splashGif = require("./assets/dressme-splash.gif");
 
@@ -121,13 +121,12 @@ function AppShell() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={showSplash ? "light-content" : "dark-content"} hidden={showSplash} />
       <LinearGradient colors={["#E8E2D8", "#F0EBE3"]} style={styles.container}>
         <View style={styles.device}>
           {showSplash ? (
             <View style={styles.splash}>
               <Image source={splashGif} style={styles.splashImage} />
-              <Text style={styles.splashLogo}>DressMe</Text>
             </View>
           ) : (
             <>
@@ -200,19 +199,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
-    gap: 22,
   },
   splashImage: {
-    width: 210,
-    height: 210,
+    width: "86%",
+    height: "86%",
     resizeMode: "contain",
-  },
-  splashLogo: {
-    fontFamily: fonts.display,
-    color: colors.gold,
-    fontSize: 46,
-    fontWeight: "700",
-    letterSpacing: 1,
   },
   screen: {
     flex: 1,

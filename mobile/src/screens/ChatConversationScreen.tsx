@@ -25,13 +25,14 @@ import {
 
 import { client } from "../services";
 import { useAuth } from "../context/AuthContext";
+import type { CallMode } from "./CallScreen";
 import type { Conversation, Message, User } from "../types/contracts";
 import { colors, radius } from "../theme/dressme";
 
 type Props = {
   conversation: Conversation;
   onBack: () => void;
-  onStartCall: (mode: "audio" | "video") => void;
+  onStartCall: (mode: CallMode, peer?: User, peerName?: string) => void;
 };
 
 const REALTIME_REFRESH_MS = 3000;
@@ -249,10 +250,10 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
           <Text numberOfLines={1} style={styles.name}>{peerName}</Text>
           <Text style={styles.presence}>{recording ? "Enregistrement vocal..." : "Temps reel actif"}</Text>
         </View>
-        <Pressable onPress={() => onStartCall("audio")} style={styles.headerButton}>
+        <Pressable onPress={() => onStartCall("audio", peer, peerName)} style={styles.headerButton}>
           <Phone size={19} color={colors.burgundy} />
         </Pressable>
-        <Pressable onPress={() => onStartCall("video")} style={styles.headerButton}>
+        <Pressable onPress={() => onStartCall("video", peer, peerName)} style={styles.headerButton}>
           <Video size={19} color={colors.burgundy} />
         </Pressable>
       </View>
