@@ -1,0 +1,74 @@
+CreatePostScreen - galerie telephone + upload media - 2026-05-03
+
+Probleme:
+- Le bloc "Ajouter une photo/video" ne faisait qu'afficher un mock.
+- L'utilisateur devait coller une URL manuellement.
+- Une image choisie localement en file:// ne peut pas etre stockee telle quelle dans MongoDB, car elle ne sera pas accessible dans le Feed/Reels apres refresh.
+
+Objectif:
+- Choisir une photo ou une video depuis la galerie du telephone.
+- Uploader le fichier vers FastAPI.
+- Creer ensuite le post/reel avec l'URL serveur retournee.
+
+Fichiers modifies:
+- mobile/src/screens/CreatePostScreen.tsx
+- mobile/src/services/types.ts
+- mobile/src/services/api/apiClient.ts
+- mobile/src/services/mock/mockClient.ts
+- mobile/src/types/contracts.ts
+- mobile/package.json
+- mobile/package-lock.json
+- mobile/app.json
+- backend/app/main.py
+- backend/app/api/router.py
+- backend/app/core/config.py
+- backend/app/schemas/contracts.py
+- backend/app/modules/media/router.py
+- .gitignore
+
+Mobile:
+- Ajout de expo-image-picker.
+- Le bloc media est maintenant cliquable.
+- Le bouton "Galerie du phone" ouvre la galerie.
+- En mode Post: selection d'images.
+- En mode Reel: selection de videos.
+- Ajout de la permission iOS photo library dans app.json.
+- Ajout de l'etat selectedMedia avec uri, nom, mime type et mediaType.
+- Au moment de publier:
+  1. si un media local a ete choisi, appel uploadMedia.
+  2. recuperation de l'URL serveur.
+  3. creation du post/reel avec cette URL.
+- L'URL manuelle n'est plus l'action principale.
+- Les boutons exemple restent disponibles pour tests rapides.
+
+Backend:
+- Ajout de POST /api/v1/media/upload.
+- Upload protege par JWT.
+- Types acceptes:
+  - image/jpeg
+  - image/png
+  - image/webp
+  - image/heic
+  - video/mp4
+  - video/quicktime
+  - video/webm
+- Stockage local dans uploads/image ou uploads/video.
+- Fichiers servis via /uploads.
+- Reponse:
+  - url
+  - filename
+  - content_type
+  - media_type
+- Ajout de UPLOAD_DIR et MEDIA_UPLOAD_MAX_MB dans la config.
+- Ajout de uploads/ dans .gitignore.
+
+Verification:
+- npx expo install expo-image-picker: OK.
+- npm run typecheck: OK.
+- Imports backend: OK.
+- Test HTTP local POST /api/v1/media/upload avec image PNG: OK.
+
+Note:
+- Comme expo-image-picker ajoute un module natif, si l'app tourne avec un dev build iOS deja compile, il faut recompiler une fois avec npx expo run:ios.
+- Si l'app tourne dans Expo Go compatible SDK 54, un refresh peut suffire.
+

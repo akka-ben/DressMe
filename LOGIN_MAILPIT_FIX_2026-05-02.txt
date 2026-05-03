@@ -1,0 +1,91 @@
+Login + Mailpit Fix - 2026-05-02
+================================
+
+Problemes trouves
+-----------------
+1. Aucun conteneur Docker ne tournait.
+   - MongoDB et Mailpit etaient donc arretes.
+   - Le backend ne pouvait pas se connecter a MongoDB.
+   - La page Mailpit http://localhost:8025 etait indisponible.
+
+2. Aucun backend FastAPI n'ecoutait sur le port 8000.
+   - L'app mobile ne pouvait pas appeler /api/v1/auth/login.
+
+3. L'adresse API mobile etait ancienne.
+   - mobile/.env pointait vers:
+     http://192.168.0.197:8000/api/v1
+   - L'IP locale actuelle detectee est:
+     192.168.0.172
+   - Correction:
+     EXPO_PUBLIC_API_URL=http://192.168.0.172:8000/api/v1
+
+
+Modifications faites
+--------------------
+1. infra/docker-compose.yml
+   - Ajout du service mailpit.
+   - Ports exposes:
+     1025 pour SMTP
+     8025 pour interface web
+   - Le backend depend maintenant aussi de mailpit.
+
+2. .env.example
+   - SMTP_HOST=mailpit pour le backend lance dans Docker.
+   - EXPO_PUBLIC_API_URL mis a jour avec l'IP locale actuelle.
+
+3. mobile/.env
+   - EXPO_PUBLIC_API_URL mis a jour:
+     http://192.168.0.172:8000/api/v1
+
+4. mobile/tsconfig.json
+   - Correction de ignoreDeprecations:
+     "6.0" -> "5.0"
+   - Raison: la version TypeScript installee est 5.9.3, et "6.0" est refusee.
+
+
+Commandes de relance
+--------------------
+Depuis la racine du projet:
+
+cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat"
+
+docker compose -f infra/docker-compose.yml up -d mongo redis minio mailpit
+
+source .venv/bin/activate
+uvicorn app.main:app --reload --app-dir backend --host 0.0.0.0 --port 8000
+
+Puis mobile:
+
+cd mobile
+npx expo start -c
+
+
+URLs a tester
+-------------
+Backend:
+http://127.0.0.1:8000/health
+
+Mailpit:
+http://localhost:8025
+
+Mobile API:
+http://192.168.0.172:8000/api/v1
+
+
+Note importante
+---------------
+Si ton IP Wi-Fi change encore, il faut mettre a jour mobile/.env avec la nouvelle IP:
+
+EXPO_PUBLIC_API_URL=http://NOUVELLE_IP:8000/api/v1
+
+
+Verification effectuee
+----------------------
+- Docker services OK:
+  mongo, redis, minio, mailpit.
+- Mailpit OK:
+  http://localhost:8025 repond en HTTP 200.
+- Backend OK:
+  /health repond 200.
+- Login API OK avec l'utilisateur de test MongoDB.
+- npm run typecheck OK.

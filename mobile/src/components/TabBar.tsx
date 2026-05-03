@@ -1,10 +1,10 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Home, PlusSquare, Search, Send, User } from "lucide-react-native";
+import { Home, Search, Send, User, Video } from "lucide-react-native";
 
 import { colors, fonts } from "../theme/dressme";
 
-export type AppTab = "feed" | "search" | "create" | "messages" | "profile";
+export type AppTab = "feed" | "search" | "reels" | "messages" | "profile";
 
 
 type Props = {
@@ -16,7 +16,7 @@ type Props = {
 const tabs: Array<{ key: AppTab; label: string; Icon: typeof Home; badge?: number }> = [
   { key: "feed", label: "Feed", Icon: Home },
   { key: "search", label: "Recherche", Icon: Search },
-  { key: "create", label: "Publier", Icon: PlusSquare },
+  { key: "reels", label: "Reels", Icon: Video },
   { key: "messages", label: "Messages", Icon: Send, badge: 3 },
   { key: "profile", label: "Profil", Icon: User },
 ];
@@ -50,10 +50,16 @@ export function TabBar({ activeTab, onChange }: Props) {
 
 const styles = StyleSheet.create({
   container: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
     flexDirection: "row",
     paddingHorizontal: 10,
     paddingTop: 8,
-    paddingBottom: 10,
+    paddingBottom: 18,
+    minHeight: 76,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.white,

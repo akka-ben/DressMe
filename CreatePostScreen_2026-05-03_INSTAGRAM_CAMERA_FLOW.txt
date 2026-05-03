@@ -1,0 +1,71 @@
+CreatePostScreen - 2026-05-03 - Flux camera style Instagram
+
+Objectif:
+- Remplacer l'ancien ecran formulaire/URL par un flux de creation proche d'Instagram.
+- Au clic sur creation, l'utilisateur arrive directement sur la camera.
+- En bas: acces galerie, bouton capture, changement camera, et modes POST / STORY / REEL / LIVE.
+- Apres capture ou choix galerie: passage a l'etape details avec preview, legende, hashtags, tags vetements et publication.
+
+Fichiers modifies:
+- mobile/src/screens/CreatePostScreen.tsx
+- mobile/App.tsx
+- mobile/app.json
+- mobile/package.json
+- mobile/package-lock.json
+
+Dependance ajoutee:
+- expo-camera (~17.0.10)
+
+Logique implementee dans CreatePostScreen:
+- Camera integree avec CameraView.
+- Demande de permission camera au lancement.
+- Demande de permission micro pour le mode REEL.
+- Modes de creation:
+  - POST: capture photo ou choix image depuis galerie.
+  - STORY: interface camera presente, capture photo possible, backend Story pas encore connecte.
+  - REEL: enregistrement video via camera ou choix video depuis galerie.
+  - LIVE: interface presente, streaming backend pas encore connecte.
+- Bouton galerie en bas a gauche.
+- Bouton capture central:
+  - photo pour POST/STORY.
+  - start/stop recording pour REEL.
+  - alerte d'information pour LIVE.
+- Bouton changement camera avant/arriere.
+- Toggle flash.
+- Overlay visuel type Instagram avec outils lateraux: Aa, Boomerang, Layout, Hands-free.
+- Badge REC + timer pendant l'enregistrement reel.
+
+Logique publication:
+- Apres capture/choix media, affichage d'un ecran details.
+- Preview image ou bloc preview video.
+- Champs:
+  - Legende.
+  - Hashtags avec parsing automatique.
+  - Tags vetements avec parsing par virgule.
+- Upload du media local via client.uploadMedia().
+- Creation MongoDB via client.createPost().
+- mediaType image pour POST.
+- mediaType video pour REEL.
+- Redirection apres publication:
+  - POST -> Feed.
+  - REEL -> Reels.
+
+Modification App.tsx:
+- La TabBar globale est masquee quand CreatePostScreen est ouvert.
+- Cela permet d'avoir une camera plein ecran comme Instagram.
+
+Modification app.json:
+- Ajout permission iOS camera:
+  NSCameraUsageDescription
+- Ajout permission iOS micro:
+  NSMicrophoneUsageDescription
+- Ajout plugin expo-camera.
+
+Verification effectuee:
+- npm run typecheck: OK.
+
+Important pour tester:
+- Comme expo-camera est un module natif, il faut reconstruire l'app iOS au moins une fois:
+  cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat/mobile"
+  npx expo run:ios
+- Apres cette reconstruction, les prochains changements JS peuvent etre refresh sans tout recompiler.

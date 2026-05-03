@@ -1,0 +1,162 @@
+[
+  {
+    "_id": "ai-rec-0001",
+    "id": "ai-rec-0001",
+    "user_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "input_image_url": "https://picsum.photos/seed/blazer1/600/800",
+    "input_description": "Blazer burgundy",
+    "suggestions": [
+      {
+        "title": "Smart Casual Bureau",
+        "items": ["Blazer burgundy", "Chemise blanche col mao", "Chino beige slim", "Mocassins marron en cuir"],
+        "occasion": "bureau",
+        "style": "smart casual",
+        "preview_url": "https://picsum.photos/seed/suggestion1/400/500"
+      },
+      {
+        "title": "Soirée Décontractée",
+        "items": ["Blazer burgundy", "T-shirt noir col rond", "Jean slim noir", "Chelsea boots noires"],
+        "occasion": "soirée",
+        "style": "casual chic",
+        "preview_url": "https://picsum.photos/seed/suggestion2/400/500"
+      },
+      {
+        "title": "Brunch Weekend",
+        "items": ["Blazer burgundy", "Pull col roulé crème", "Pantalon large gris", "Sneakers blanches"],
+        "occasion": "brunch",
+        "style": "relaxed chic",
+        "preview_url": "https://picsum.photos/seed/suggestion3/400/500"
+      }
+    ],
+    "model_used": "gpt-4o-vision",
+    "created_at": "2026-05-01T20:00:00.000+00:00"
+  },
+  {
+    "_id": "ai-rec-0002",
+    "id": "ai-rec-0002",
+    "user_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "input_image_url": "https://picsum.photos/seed/jordan4/600/800",
+    "input_description": "Jordan 4 Military Black",
+    "suggestions": [
+      {
+        "title": "Streetwear Clean",
+        "items": ["Jordan 4 Military Black", "Jogger noir slim", "T-shirt blanc oversized", "Casquette noire"],
+        "occasion": "casual",
+        "style": "streetwear",
+        "preview_url": "https://picsum.photos/seed/suggestion4/400/500"
+      },
+      {
+        "title": "Cargo Vibes",
+        "items": ["Jordan 4 Military Black", "Cargo pants olive", "Hoodie gris chiné", "Sac banane noir"],
+        "occasion": "sortie",
+        "style": "urban",
+        "preview_url": "https://picsum.photos/seed/suggestion5/400/500"
+      },
+      {
+        "title": "Smart Street",
+        "items": ["Jordan 4 Military Black", "Pantalon à pinces noir", "Chemise oversized blanche", "Montre silver"],
+        "occasion": "rendez-vous",
+        "style": "smart street",
+        "preview_url": "https://picsum.photos/seed/suggestion6/400/500"
+      }
+    ],
+    "model_used": "gpt-4o-vision",
+    "created_at": "2026-04-30T15:00:00.000+00:00"
+  },
+  {
+    "_id": "ai-rec-0003",
+    "id": "ai-rec-0003",
+    "user_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "input_image_url": "https://picsum.photos/seed/hijab1/600/800",
+    "input_description": "Camel coat avec hijab cream",
+    "suggestions": [
+      {
+        "title": "Bureau Élégant",
+        "items": ["Camel coat", "Hijab cream", "Robe midi noire", "Bottines beiges", "Sac structuré camel"],
+        "occasion": "bureau",
+        "style": "modest elegant",
+        "preview_url": "https://picsum.photos/seed/suggestion7/400/500"
+      },
+      {
+        "title": "Weekend Chic",
+        "items": ["Camel coat", "Hijab cream", "Jean droit bleu clair", "Pull crème", "Baskets blanches"],
+        "occasion": "weekend",
+        "style": "modest casual",
+        "preview_url": "https://picsum.photos/seed/suggestion8/400/500"
+      },
+      {
+        "title": "Occasion Spéciale",
+        "items": ["Camel coat", "Hijab doré", "Longue jupe plissée bordeaux", "Escarpins nude", "Pochette dorée"],
+        "occasion": "occasion",
+        "style": "modest glam",
+        "preview_url": "https://picsum.photos/seed/suggestion9/400/500"
+      }
+    ],
+    "model_used": "gpt-4o-vision",
+    "created_at": "2026-05-01T12:00:00.000+00:00"
+  },
+  {
+    "_id": "ai-rec-0004",
+    "id": "ai-rec-0004",
+    "user_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "input_image_url": "https://picsum.photos/seed/vintage1/600/800",
+    "input_description": "Veste en cuir vintage marron 80s",
+    "suggestions": [
+      {
+        "title": "Rock Rétro",
+        "items": ["Veste cuir marron", "T-shirt band vintage noir", "Jean slim délavé", "Boots Dr. Martens"],
+        "occasion": "sortie",
+        "style": "rock vintage",
+        "preview_url": "https://picsum.photos/seed/suggestion10/400/500"
+      },
+      {
+        "title": "Casual Cool",
+        "items": ["Veste cuir marron", "Sweat à capuche gris", "Chino kaki", "Converse blanches"],
+        "occasion": "casual",
+        "style": "vintage casual",
+        "preview_url": "https://picsum.photos/seed/suggestion11/400/500"
+      },
+      {
+        "title": "Soirée Vintage",
+        "items": ["Veste cuir marron", "Col roulé noir", "Pantalon large noir", "Derbies cuir"],
+        "occasion": "soirée",
+        "style": "vintage chic",
+        "preview_url": "https://picsum.photos/seed/suggestion12/400/500"
+      }
+    ],
+    "model_used": "gpt-4o-vision",
+    "created_at": "2026-04-29T14:00:00.000+00:00"
+  },
+  {
+    "_id": "ai-rec-0005",
+    "id": "ai-rec-0005",
+    "user_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "input_image_url": "https://picsum.photos/seed/marrakech1/600/800",
+    "input_description": "Robe fluide terracotta bohème",
+    "suggestions": [
+      {
+        "title": "Bohème Complet",
+        "items": ["Robe terracotta", "Chapeau de paille", "Sandales plates dorées", "Bijoux ethniques", "Sac tressé"],
+        "occasion": "vacances",
+        "style": "bohemian",
+        "preview_url": "https://picsum.photos/seed/suggestion13/400/500"
+      },
+      {
+        "title": "City Bohème",
+        "items": ["Robe terracotta", "Veste en jean courte", "Espadrilles compensées", "Lunettes de soleil rondes"],
+        "occasion": "sortie ville",
+        "style": "boho urban",
+        "preview_url": "https://picsum.photos/seed/suggestion14/400/500"
+      },
+      {
+        "title": "Soirée Été",
+        "items": ["Robe terracotta", "Kimono léger crème", "Talons nude", "Clutch en raphia"],
+        "occasion": "soirée",
+        "style": "boho chic",
+        "preview_url": "https://picsum.photos/seed/suggestion15/400/500"
+      }
+    ],
+    "model_used": "gpt-4o-vision",
+    "created_at": "2026-05-02T10:00:00.000+00:00"
+  }
+]

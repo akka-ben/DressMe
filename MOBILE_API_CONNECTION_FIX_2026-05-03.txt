@@ -1,0 +1,70 @@
+Mobile API Connection Fix - 2026-05-03
+=====================================
+
+Probleme observe
+----------------
+Le backend fonctionne dans Swagger/FastAPI, mais l'application mobile affiche:
+
+Network request timed out
+
+Cause
+-----
+Le simulateur iOS utilisait une ancienne IP locale dans mobile/.env:
+
+http://192.168.0.172:8000/api/v1
+
+L'IP Wi-Fi du Mac a change et est revenue a:
+
+192.168.0.197
+
+Mais pour un iPhone Simulator lance sur le meme Mac, l'URL la plus stable est:
+
+http://127.0.0.1:8000/api/v1
+
+
+Modifications faites
+--------------------
+1. mobile/.env
+   - EXPO_PUBLIC_API_URL remplace par:
+     http://127.0.0.1:8000/api/v1
+
+2. mobile/src/services/api/apiClient.ts
+   - DEFAULT_API_URL remplace par:
+     http://127.0.0.1:8000/api/v1
+
+3. .env.example
+   - EXPO_PUBLIC_API_URL remplace par:
+     http://127.0.0.1:8000/api/v1
+
+
+Pourquoi 127.0.0.1
+------------------
+Pour iOS Simulator, l'application tourne sur le Mac via le simulateur.
+Elle peut joindre le backend local avec:
+
+http://127.0.0.1:8000
+
+Pour un vrai telephone physique, il faudra utiliser l'IP Wi-Fi du Mac:
+
+http://IP_DU_MAC:8000/api/v1
+
+
+Commandes de test
+-----------------
+Backend:
+
+cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat"
+source .venv/bin/activate
+uvicorn app.main:app --reload --app-dir backend --host 0.0.0.0 --port 8000
+
+Mobile:
+
+cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat/mobile"
+npx expo start -c
+
+
+Important
+---------
+Apres modification de mobile/.env, il faut relancer Expo avec cache clean:
+
+npx expo start -c

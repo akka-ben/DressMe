@@ -1,0 +1,49 @@
+HomeFeedScreen - 2026-05-03 - Story viewer type Instagram
+
+Objectif:
+- Ajuster uniquement l'affichage et le comportement du viewer Story.
+- Ajouter un timer/progress bar reel.
+- Differencier ma story et les stories des autres.
+
+Backend ajoute:
+- StoryDTO contient maintenant viewer_count.
+- Nouvel endpoint:
+  - GET /api/v1/stories/{story_id}/viewers
+- Seul le proprietaire de la story peut voir la liste des viewers.
+- Nouvel endpoint:
+  - GET /api/v1/users/me/followers
+- Les followers sont lus depuis la collection follows si elle existe.
+- Fallback backend: retourne les autres utilisateurs Mongo pour permettre la mention meme sans systeme follow complet.
+
+Frontend ajoute:
+- Story type enrichi avec viewerCount.
+- Client API enrichi:
+  - getStoryViewers(storyId, token)
+  - getFollowers(token)
+- Timer story fonctionnel:
+  - Image: 8 secondes.
+  - Video: 15 secondes.
+  - Fermeture automatique a la fin du timer.
+  - Le timer se pause quand le sheet Activite ou Mention est ouvert.
+
+Differenciation:
+- Ma story:
+  - Pas de champ commentaire/message.
+  - Footer actions: Activite, Partager, Mention, Envoyer, Plus.
+  - Activite affiche la liste des utilisateurs qui ont vu la story.
+  - Mention affiche une liste de followers.
+- Story d'un autre utilisateur:
+  - Champ "Envoyer un message..."
+  - Bouton like.
+  - Bouton envoyer.
+  - Pas d'acces a la liste des viewers.
+
+Autres details:
+- Ouvrir sa propre story ne la marque plus comme vue.
+- Ouvrir la story d'un autre utilisateur appelle /stories/{story_id}/view.
+- Les mentions utilisent les followers API avec fallback demo si aucune donnee n'est disponible.
+
+Verification:
+- npm run typecheck: OK.
+- Backend imports: OK.
+- git diff --check: OK.

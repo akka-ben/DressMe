@@ -26,6 +26,7 @@ env/
 # FASTAPI / BUILD
 # ========================
 *.log
+uploads/
 
 # ========================
 # NODE / REACT NATIVE

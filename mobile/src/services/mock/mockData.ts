@@ -21,6 +21,7 @@ export const mockPosts: Post[] = [
     id: "p-1",
     author: demoUser,
     caption: "Which one works best for dinner tonight?",
+    mediaType: "image",
     hashtags: ["#casual", "#nightout"],
     garmentTags: ["blazer", "white-shirt", "brown-loafers"],
     imageUrls: [
@@ -29,7 +30,9 @@ export const mockPosts: Post[] = [
     ],
     likeCount: 42,
     commentCount: 6,
+    shareCount: 0,
     likedByMe: true,
+    savedByMe: false,
     createdAt: new Date().toISOString(),
     poll: {
       id: "poll-1",

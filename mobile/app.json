@@ -4,9 +4,35 @@
     "slug": "dressme",
     "version": "1.0.0",
     "orientation": "portrait",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "web": {
       "bundler": "metro"
-    }
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.dressme",
+      "infoPlist": {
+        "NSCameraUsageDescription": "DressMe utilise votre camera pour capturer des tenues, reels et stories.",
+        "NSMicrophoneUsageDescription": "DressMe utilise votre micro pour enregistrer le son des reels.",
+        "NSPhotoLibraryUsageDescription": "DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier."
+      }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "DressMe utilise votre camera pour capturer des tenues, reels et stories.",
+          "microphonePermission": "DressMe utilise votre micro pour enregistrer le son des reels.",
+          "recordAudioAndroid": true
+        }
+      ]
+    ]
   }
 }

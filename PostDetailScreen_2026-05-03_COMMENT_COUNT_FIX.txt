@@ -1,0 +1,74 @@
+PostDetailScreen - Correction compteur commentaires - 2026-05-03
+===============================================================
+
+Probleme
+--------
+Dans PostDetailScreen, le compteur affichait 3 commentaires alors que la liste
+visible contenait 1 seul commentaire.
+
+
+Cause
+-----
+Le compteur venait du champ denormalise:
+
+posts.comment_count
+
+Mais les commentaires reels viennent de la collection:
+
+comments
+
+Apres import JSON, certains posts avaient un comment_count historique different
+du nombre reel de documents dans comments.
+
+Exemple verifie:
+
+post_id: e5555555-aaaa-bbbb-cccc-ddddeeee0001
+posts.comment_count: 3
+comments.count_documents({ post_id }): 1
+
+
+Correction
+----------
+Fichier modifie:
+
+backend/app/modules/social/service.py
+
+Dans post_to_dto, le champ PostDTO.comment_count est maintenant calcule avec:
+
+db.comments.count_documents({ "post_id": post_id })
+
+Donc le compteur affiche toujours le nombre reel de commentaires visibles.
+
+
+Impact
+------
+La correction s'applique a:
+
+- PostDetailScreen
+- HomeFeedScreen
+- tous les endpoints qui retournent PostDTO:
+  GET /api/v1/feed
+  GET /api/v1/posts/{post_id}
+  POST /api/v1/posts/{post_id}/like
+  POST /api/v1/posts/{post_id}/save
+  GET /api/v1/users/me/saved-posts
+
+
+Validation
+----------
+Avant:
+
+GET /api/v1/posts/e5555555-aaaa-bbbb-cccc-ddddeeee0001
+comment_count: 3
+
+Apres:
+
+GET /api/v1/posts/e5555555-aaaa-bbbb-cccc-ddddeeee0001
+comment_count: 1
+
+Tests effectues:
+
+- backend import ok
+- GET /api/v1/posts/{post_id} OK avec comment_count=1
+- GET /api/v1/feed?limit=3 OK avec compteurs reels
+- npm run typecheck OK

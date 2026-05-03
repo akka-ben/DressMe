@@ -65,3 +65,15 @@ async def init_db() -> None:
     await ensure_unique_string_index("users", "reset_token", "users_reset_token_unique")
     await database.posts.create_index([("created_at", ASCENDING)], name="posts_created_at")
     await database.posts.create_index([("author_id", ASCENDING)], name="posts_author_id")
+    await database.comments.create_index([("post_id", ASCENDING), ("created_at", ASCENDING)], name="comments_post_created_at")
+    await database.saved_posts.create_index([("user_id", ASCENDING), ("created_at", ASCENDING)], name="saved_posts_user_created_at")
+    await database.saved_posts.create_index(
+        [("user_id", ASCENDING), ("post_id", ASCENDING)],
+        name="saved_posts_user_post_unique",
+        unique=True,
+    )
+    await database.post_shares.create_index([("post_id", ASCENDING), ("created_at", ASCENDING)], name="post_shares_post_created_at")
+    await database.post_shares.create_index([("user_id", ASCENDING), ("created_at", ASCENDING)], name="post_shares_user_created_at")
+    await database.stories.create_index([("created_at", ASCENDING)], name="stories_created_at")
+    await database.stories.create_index([("expires_at", ASCENDING)], name="stories_expires_at")
+    await database.stories.create_index([("author_id", ASCENDING), ("created_at", ASCENDING)], name="stories_author_created_at")

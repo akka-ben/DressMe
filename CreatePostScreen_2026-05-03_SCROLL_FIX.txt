@@ -1,0 +1,25 @@
+CreatePostScreen - correction scroll - 2026-05-03
+
+Probleme:
+- CreatePostScreen etait rendu dans un View fixe depuis App.tsx.
+- L'ecran lui-meme retournait une simple View card, sans ScrollView.
+- Quand le contenu depassait la hauteur disponible, la partie basse etait coupee derriere la TabBar.
+- Le badge Logout absolu recouvrait aussi le header de creation.
+
+Fichiers modifies:
+- mobile/src/screens/CreatePostScreen.tsx
+- mobile/App.tsx
+
+Corrections:
+- Ajout d'un KeyboardAvoidingView autour de CreatePostScreen.
+- Ajout d'un ScrollView avec keyboardShouldPersistTaps="handled".
+- Ajout de styles shell, scroll, scrollContent.
+- Ajout de paddingBottom 112 dans scrollContent pour laisser de l'espace au-dessus de la TabBar.
+- Conservation de la card existante et de toute la logique Post/Reel.
+- Masquage du badge Logout uniquement pendant l'ouverture de CreatePostScreen pour eviter le chevauchement du titre et du bouton Publier.
+
+Logique metier:
+- Aucun endpoint modifie.
+- Aucune logique MongoDB modifiee.
+- Aucune logique de publication modifiee.
+

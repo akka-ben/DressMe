@@ -30,14 +30,36 @@ export type Post = {
   id: string;
   author: User;
   caption: string;
+  mediaType: "image" | "video";
   hashtags: string[];
   garmentTags: string[];
   imageUrls: string[];
   likeCount: number;
   commentCount: number;
+  shareCount: number;
   likedByMe: boolean;
+  savedByMe: boolean;
   createdAt: string;
   poll?: Poll;
+};
+
+export type MediaUpload = {
+  url: string;
+  filename: string;
+  contentType: string;
+  mediaType: "image" | "video";
+};
+
+export type Story = {
+  id: string;
+  author: User;
+  mediaUrl: string;
+  mediaType: "image" | "video";
+  caption?: string;
+  viewerCount: number;
+  viewedByMe: boolean;
+  createdAt: string;
+  expiresAt: string;
 };
 
 export type Comment = {

@@ -5,10 +5,12 @@ import type {
   AuthMessage,
   AuthSession,
   Comment,
+  MediaUpload,
   Poll,
   PollOption,
   Post,
   Profile,
+  Story,
   User,
 } from "../../types/contracts";
 
@@ -22,7 +24,7 @@ declare const process:
     }
   | undefined;
 
-const DEFAULT_API_URL = "http://192.168.0.197:8000/api/v1";
+const DEFAULT_API_URL = "http://127.0.0.1:8000/api/v1";
 
 export const API_URL =
   typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
@@ -73,12 +75,15 @@ type BackendPost = {
   id: string;
   author: BackendUser;
   caption: string;
+  media_type?: "image" | "video";
   hashtags: string[];
   garment_tags: string[];
   image_urls: string[];
   like_count: number;
   comment_count: number;
+  share_count?: number;
   liked_by_me: boolean;
+  saved_by_me?: boolean;
   created_at: string;
   poll?: BackendPoll | null;
 };
@@ -88,6 +93,25 @@ type BackendComment = {
   author: BackendUser;
   content: string;
   created_at: string;
+};
+
+type BackendMediaUpload = {
+  url: string;
+  filename: string;
+  content_type: string;
+  media_type: "image" | "video";
+};
+
+type BackendStory = {
+  id: string;
+  author: BackendUser;
+  media_url: string;
+  media_type: "image" | "video";
+  caption?: string | null;
+  viewer_count?: number;
+  viewed_by_me: boolean;
+  created_at: string;
+  expires_at: string;
 };
 
 type BackendAIRecommendationItem = {
@@ -131,6 +155,41 @@ export class ApiDressMeClient implements DressMeClient {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...init?.headers,
       },
+    });
+
+    if (!response.ok) {
+      let details: unknown;
+      try {
+        details = await response.json();
+      } catch {
+        details = undefined;
+      }
+
+      const message =
+        typeof details === "object" &&
+        details !== null &&
+        "detail" in details &&
+        typeof details.detail === "string"
+          ? details.detail
+          : `Request failed for ${path}`;
+
+      throw new ApiError(message, response.status, details);
+    }
+
+    return (await response.json()) as T;
+  }
+
+  private async requestFormData<T>(
+    path: string,
+    body: FormData,
+    token: string,
+  ): Promise<T> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body,
     });
 
     if (!response.ok) {
@@ -220,9 +279,113 @@ export class ApiDressMeClient implements DressMeClient {
     return posts.map(mapPost);
   }
 
+  async getReels(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]> {
+    const params = new URLSearchParams();
+    if (input?.limit) {
+      params.set("limit", String(input.limit));
+    }
+    if (input?.offset) {
+      params.set("offset", String(input.offset));
+    }
+
+    const query = params.toString();
+    const posts = await this.request<BackendPost[]>(
+      query ? `/reels?${query}` : "/reels",
+      undefined,
+      input?.token,
+    );
+    return posts.map(mapPost);
+  }
+
+  async uploadMedia(input: { uri: string; name: string; type: string }, token: string): Promise<MediaUpload> {
+    const formData = new FormData();
+    formData.append(
+      "file",
+      {
+        uri: input.uri,
+        name: input.name,
+        type: input.type,
+      } as unknown as Blob,
+    );
+
+    const upload = await this.requestFormData<BackendMediaUpload>("/media/upload", formData, token);
+    return mapMediaUpload(upload);
+  }
+
+  async getStories(input?: { token?: string; limit?: number }): Promise<Story[]> {
+    const params = new URLSearchParams();
+    if (input?.limit) {
+      params.set("limit", String(input.limit));
+    }
+
+    const query = params.toString();
+    const stories = await this.request<BackendStory[]>(
+      query ? `/stories?${query}` : "/stories",
+      undefined,
+      input?.token,
+    );
+    return stories.map(mapStory);
+  }
+
+  async getStoryViewers(storyId: string, token: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>(
+      `/stories/${storyId}/viewers`,
+      undefined,
+      token,
+    );
+    return users.map(mapUser);
+  }
+
+  async createStory(
+    input: {
+      mediaUrl: string;
+      mediaType?: "image" | "video";
+      caption?: string;
+    },
+    token: string,
+  ): Promise<Story> {
+    const story = await this.request<BackendStory>(
+      "/stories",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          media_url: input.mediaUrl,
+          media_type: input.mediaType ?? "image",
+          caption: input.caption,
+        }),
+      },
+      token,
+    );
+    return mapStory(story);
+  }
+
+  async markStoryViewed(storyId: string, token: string): Promise<Story> {
+    const story = await this.request<BackendStory>(
+      `/stories/${storyId}/view`,
+      { method: "POST" },
+      token,
+    );
+    return mapStory(story);
+  }
+
+  async getFollowers(token: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>("/users/me/followers", undefined, token);
+    return users.map(mapUser);
+  }
+
+  async getPost(postId: string, input?: { token?: string }): Promise<Post> {
+    const post = await this.request<BackendPost>(
+      `/posts/${postId}`,
+      undefined,
+      input?.token,
+    );
+    return mapPost(post);
+  }
+
   async createPost(
     input: {
       caption: string;
+      mediaType?: "image" | "video";
       imageUrls: string[];
       hashtags: string[];
       garmentTags?: string[];
@@ -235,6 +398,7 @@ export class ApiDressMeClient implements DressMeClient {
         method: "POST",
         body: JSON.stringify({
           caption: input.caption,
+          media_type: input.mediaType ?? "image",
           image_urls: input.imageUrls,
           hashtags: input.hashtags,
           garment_tags: input.garmentTags ?? [],
@@ -254,9 +418,76 @@ export class ApiDressMeClient implements DressMeClient {
     return mapPost(post);
   }
 
-  async getPostComments(postId: string): Promise<Comment[]> {
-    const comments = await this.request<BackendComment[]>(`/posts/${postId}/comments`);
+  async sharePost(postId: string, token: string): Promise<Post> {
+    const post = await this.request<BackendPost>(
+      `/posts/${postId}/share`,
+      { method: "POST" },
+      token,
+    );
+    return mapPost(post);
+  }
+
+  async togglePostSave(postId: string, token: string): Promise<Post> {
+    const post = await this.request<BackendPost>(
+      `/posts/${postId}/save`,
+      { method: "POST" },
+      token,
+    );
+    return mapPost(post);
+  }
+
+  async getPostComments(postId: string, input?: { limit?: number; offset?: number }): Promise<Comment[]> {
+    const params = new URLSearchParams();
+    if (input?.limit) {
+      params.set("limit", String(input.limit));
+    }
+    if (input?.offset) {
+      params.set("offset", String(input.offset));
+    }
+
+    const query = params.toString();
+    const comments = await this.request<BackendComment[]>(
+      query ? `/posts/${postId}/comments?${query}` : `/posts/${postId}/comments`,
+    );
     return comments.map(mapComment);
+  }
+
+  async addPostComment(postId: string, content: string, token: string): Promise<Comment> {
+    const comment = await this.request<BackendComment>(
+      `/posts/${postId}/comments`,
+      {
+        method: "POST",
+        body: JSON.stringify({ content }),
+      },
+      token,
+    );
+    return mapComment(comment);
+  }
+
+  async getSavedPosts(input: {
+    token: string;
+    mediaType?: "image" | "video";
+    limit?: number;
+    offset?: number;
+  }): Promise<Post[]> {
+    const params = new URLSearchParams();
+    if (input.mediaType) {
+      params.set("media_type", input.mediaType);
+    }
+    if (input.limit) {
+      params.set("limit", String(input.limit));
+    }
+    if (input.offset) {
+      params.set("offset", String(input.offset));
+    }
+
+    const query = params.toString();
+    const posts = await this.request<BackendPost[]>(
+      query ? `/users/me/saved-posts?${query}` : "/users/me/saved-posts",
+      undefined,
+      input.token,
+    );
+    return posts.map(mapPost);
   }
 
   async getProfile(userId: string): Promise<Profile> {
@@ -319,19 +550,45 @@ function mapProfile(profile: BackendProfile): Profile {
   };
 }
 
+function mapMediaUpload(upload: BackendMediaUpload): MediaUpload {
+  return {
+    url: upload.url,
+    filename: upload.filename,
+    contentType: upload.content_type,
+    mediaType: upload.media_type,
+  };
+}
+
 function mapPost(post: BackendPost): Post {
   return {
     id: post.id,
     author: mapUser(post.author),
     caption: post.caption,
+    mediaType: post.media_type ?? "image",
     hashtags: post.hashtags,
     garmentTags: post.garment_tags,
     imageUrls: post.image_urls,
     likeCount: post.like_count,
     commentCount: post.comment_count,
+    shareCount: post.share_count ?? 0,
     likedByMe: post.liked_by_me,
+    savedByMe: post.saved_by_me ?? false,
     createdAt: post.created_at,
     poll: post.poll ? mapPoll(post.poll) : undefined,
+  };
+}
+
+function mapStory(story: BackendStory): Story {
+  return {
+    id: story.id,
+    author: mapUser(story.author),
+    mediaUrl: story.media_url,
+    mediaType: story.media_type,
+    caption: story.caption ?? undefined,
+    viewerCount: story.viewer_count ?? 0,
+    viewedByMe: story.viewed_by_me,
+    createdAt: story.created_at,
+    expiresAt: story.expires_at,
   };
 }
 

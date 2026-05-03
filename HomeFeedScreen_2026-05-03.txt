@@ -1,0 +1,120 @@
+HomeFeedScreen - Correction import JSON posts - 2026-05-03
+=========================================================
+
+Probleme observe
+----------------
+Apres import de nouveaux posts JSON dans MongoDB, l'application affichait:
+
+Feed indisponible
+Request failed for /feed?limit=10
+
+Le backend FastAPI retournait une erreur 500 sur:
+
+GET /api/v1/feed?limit=10
+
+
+Cause
+-----
+Les documents importes depuis JSON n'avaient pas exactement le meme schema que
+les posts crees par l'application.
+
+Exemple:
+
+garment_tags contenait des objets:
+
+{
+  "type": "dress",
+  "color": "terracotta",
+  "style": "bohemian"
+}
+
+Mais l'API PostDTO attendait:
+
+garment_tags: list[str]
+
+Pydantic refusait donc la reponse et FastAPI retournait 500.
+
+
+Correction faite
+----------------
+Fichier modifie:
+
+backend/app/modules/social/service.py
+
+Ajout de fonctions de normalisation:
+
+1. normalize_datetime
+   - Accepte datetime MongoDB.
+   - Accepte string ISO venant d'un import JSON.
+   - Fallback vers utc_now si format invalide.
+
+2. normalize_string_list
+   - Accepte list[str].
+   - Accepte string simple.
+   - Accepte list[dict].
+   - Convertit les objets garment_tags en strings lisibles.
+
+   Exemple:
+   {"type": "dress", "color": "terracotta", "style": "bohemian"}
+   devient:
+   "dress terracotta bohemian"
+
+3. normalize_image_urls
+   - Accepte:
+     image_urls
+     images
+     media
+     image_url
+     image
+   - Accepte list[str] ou list[dict].
+
+4. safe_int
+   - Evite les erreurs si votes/comment_count arrivent comme string ou null.
+
+
+Champs rendus compatibles
+-------------------------
+- caption ou description
+- hashtags string/list
+- garment_tags string/list/dict
+- image_urls/images/media/image_url/image
+- comment_count/comments_count
+- created_at datetime/string ISO
+- poll options avec image_url/image/url
+
+
+Validation effectuee
+--------------------
+Avant correction:
+
+GET /api/v1/feed?limit=10 -> 500 Internal Server Error
+
+Apres correction:
+
+GET /api/v1/feed?limit=10 -> 200 OK
+
+Le backend retourne maintenant les posts importes depuis MongoDB avec un format
+compatible mobile.
+
+Exemple de sortie corrigee:
+
+garment_tags:
+[
+  "dress terracotta bohemian",
+  "hat straw summer"
+]
+
+Tests faits:
+
+- backend import ok
+- GET /api/v1/feed?limit=10 OK
+- GET /api/v1/feed?limit=3 OK
+- npm run typecheck OK
+
+
+Action cote app
+---------------
+Relancer l'application ou tirer le feed vers le bas.
+Si Expo garde l'ancien etat:
+
+npx expo start -c

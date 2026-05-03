@@ -3,8 +3,10 @@ import type {
   AuthMessage,
   AuthSession,
   Comment,
+  MediaUpload,
   Post,
   Profile,
+  Story,
   User,
 } from "../types/contracts";
 
@@ -20,9 +22,25 @@ export interface DressMeClient {
   resetPassword(token: string, newPassword: string): Promise<AuthMessage>;
   getMe(token: string): Promise<User>;
   getFeed(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]>;
+  getReels(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]>;
+  uploadMedia(input: { uri: string; name: string; type: string }, token: string): Promise<MediaUpload>;
+  getStories(input?: { token?: string; limit?: number }): Promise<Story[]>;
+  getStoryViewers(storyId: string, token: string): Promise<User[]>;
+  createStory(
+    input: {
+      mediaUrl: string;
+      mediaType?: "image" | "video";
+      caption?: string;
+    },
+    token: string,
+  ): Promise<Story>;
+  markStoryViewed(storyId: string, token: string): Promise<Story>;
+  getFollowers(token: string): Promise<User[]>;
+  getPost(postId: string, input?: { token?: string }): Promise<Post>;
   createPost(
     input: {
       caption: string;
+      mediaType?: "image" | "video";
       imageUrls: string[];
       hashtags: string[];
       garmentTags?: string[];
@@ -30,7 +48,11 @@ export interface DressMeClient {
     token: string,
   ): Promise<Post>;
   togglePostLike(postId: string, token: string): Promise<Post>;
-  getPostComments(postId: string): Promise<Comment[]>;
+  sharePost(postId: string, token: string): Promise<Post>;
+  togglePostSave(postId: string, token: string): Promise<Post>;
+  getPostComments(postId: string, input?: { limit?: number; offset?: number }): Promise<Comment[]>;
+  addPostComment(postId: string, content: string, token: string): Promise<Comment>;
+  getSavedPosts(input: { token: string; mediaType?: "image" | "video"; limit?: number; offset?: number }): Promise<Post[]>;
   getProfile(userId: string): Promise<Profile>;
   helpMeChoose(input: {
     imageUrl: string;

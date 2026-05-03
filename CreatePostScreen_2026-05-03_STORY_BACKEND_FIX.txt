@@ -1,0 +1,57 @@
+CreatePostScreen / Stories - 2026-05-03 - Publication Story reelle
+
+Probleme:
+- Le mode STORY etait present dans l'interface camera, mais il n'etait pas connecte au backend.
+- Le post image fonctionnait, mais une story ne pouvait pas etre publiee ni affichee dans la barre des stories.
+
+Backend ajoute:
+- Ajout DTO StoryDTO.
+- Ajout payload CreateStoryInput.
+- Ajout collection MongoDB stories.
+- Ajout endpoints:
+  - GET /api/v1/stories
+  - POST /api/v1/stories
+  - POST /api/v1/stories/{story_id}/view
+- Une story expire automatiquement cote donnees apres 24h via le champ expires_at.
+- Une story stocke:
+  - id
+  - author_id
+  - media_url
+  - media_type
+  - caption
+  - viewed_user_ids
+  - created_at
+  - updated_at
+  - expires_at
+- Ajout indexes MongoDB:
+  - stories_created_at
+  - stories_expires_at
+  - stories_author_created_at
+
+Frontend ajoute:
+- Ajout type Story.
+- Ajout client API:
+  - getStories()
+  - createStory()
+  - markStoryViewed()
+- Le Feed charge maintenant les stories reelles depuis /stories.
+- Quand l'utilisateur ouvre une story reelle, elle est marquee comme vue via /stories/{id}/view.
+- Si aucune story reelle n'existe, les stories demo restent visibles pour garder l'interface remplie.
+
+CreatePostScreen:
+- Le mode STORY est maintenant publiable.
+- Capture photo en STORY -> upload media -> creation story MongoDB.
+- Apres publication, retour au Feed pour voir la story dans la barre des stories.
+
+Verification:
+- Backend import OK.
+- npm run typecheck OK.
+
+Test rapide:
+1. Redemarrer le backend pour charger les nouveaux endpoints.
+2. Ouvrir l'app.
+3. Cliquer creation.
+4. Choisir STORY.
+5. Capturer une photo.
+6. Publier.
+7. Retour Feed: la story doit apparaitre en haut dans la barre des stories.

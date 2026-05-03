@@ -1,0 +1,41 @@
+CreatePostScreen - formulaire fonctionnel - 2026-05-03
+
+Probleme:
+- L'ecran de creation etait trop proche d'un mock UI.
+- Certains elements etaient visuellement des cartes mais ne faisaient rien.
+- Les champs n'etaient pas assez explicites pour publier correctement une image ou un reel.
+- Le bouton Publier restait cliquable meme quand le formulaire n'etait pas valide.
+
+Fichiers modifies:
+- mobile/src/screens/CreatePostScreen.tsx
+
+Corrections:
+- Ajout d'un vrai champ URL media pour image ou reel.
+- Ajout d'un champ Description editable.
+- Ajout d'un champ Hashtags editable avec parsing automatique.
+- Ajout d'un champ Tags vetements editable avec parsing par virgule.
+- Ajout d'un bouton Image exemple / Video exemple.
+- Ajout d'un bouton Effacer URL.
+- Validation de l'URL: elle doit commencer par http:// ou https://.
+- Validation de publication: session + URL valide + description obligatoire.
+- Bouton Publier desactive quand le formulaire est invalide ou en cours d'envoi.
+- Le bouton Publier du header respecte aussi la validation.
+- Le toggle Post/Reel met automatiquement une URL exemple compatible.
+- Pour Post: envoi mediaType image au backend.
+- Pour Reel: envoi mediaType video au backend.
+- Les garmentTags sont maintenant envoyes au backend.
+- Les anciennes cartes non fonctionnelles sont devenues informatives au lieu de faux boutons.
+
+Backend utilise:
+- POST /api/v1/posts
+- payload:
+  - caption
+  - media_type: image ou video
+  - image_urls
+  - hashtags
+  - garment_tags
+
+Verification:
+- npm run typecheck: OK.
+- git diff --check: OK.
+

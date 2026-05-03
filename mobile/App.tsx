@@ -3,7 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -19,7 +19,9 @@ import { ForgotPasswordScreen } from "./src/screens/ForgotPasswordScreen";
 import { HomeFeedScreen } from "./src/screens/HomeFeedScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
+import { PostDetailScreen } from "./src/screens/PostDetailScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
+import { ReelsScreen } from "./src/screens/ReelsScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
@@ -27,6 +29,7 @@ import { MessagesScreen } from "./src/screens/MessagesScreen";
 import { colors, fonts } from "./src/theme/dressme";
 
 const splashGif = require("./assets/dressme-splash.gif");
+const AUTHENTICATED_TOP_SPACE = Platform.OS === "ios" ? 58 : StatusBar.currentHeight ?? 0;
 
 type AuthRoute = "onboarding" | "login" | "register" | "forgot" | "reset";
 
@@ -45,6 +48,8 @@ function AppShell() {
   const [lastRegisteredEmail, setLastRegisteredEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [showSplash, setShowSplash] = useState(true);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [showCreatePost, setShowCreatePost] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 3500);
@@ -76,7 +81,11 @@ function AppShell() {
         return (
           <LoginScreen
             initialEmail={lastRegisteredEmail}
-            onLoginSuccess={() => setActiveTab("feed")}
+            onLoginSuccess={() => {
+              setSelectedPostId(null);
+              setShowCreatePost(false);
+              setActiveTab("feed");
+            }}
             onOpenRegister={() => setAuthRoute("register")}
             onOpenForgotPassword={() => setAuthRoute("forgot")}
           />
@@ -105,23 +114,54 @@ function AppShell() {
   };
 
   const renderTab = () => {
+    if (showCreatePost) {
+      return (
+        <CreatePostScreen
+          onClose={() => setShowCreatePost(false)}
+          onCreated={(createdType) => {
+            setShowCreatePost(false);
+            setSelectedPostId(null);
+            setActiveTab(createdType === "reel" ? "reels" : "feed");
+          }}
+        />
+      );
+    }
+
+    if (selectedPostId) {
+      return <PostDetailScreen postId={selectedPostId} onBack={() => setSelectedPostId(null)} />;
+    }
+
     switch (activeTab) {
       case "feed":
-        return <HomeFeedScreen />;
+        return (
+          <HomeFeedScreen
+            onOpenPost={setSelectedPostId}
+            onOpenCreate={() => {
+              setSelectedPostId(null);
+              setShowCreatePost(true);
+            }}
+          />
+        );
       case "search":
         return <SearchScreen />;
-      case "create":
-        return <CreatePostScreen />;
+      case "reels":
+        return <ReelsScreen onOpenPost={setSelectedPostId} />;
       case "messages":
         return <MessagesScreen />;
       case "profile":
-        return <ProfileScreen />;
+        return <ProfileScreen onOpenPost={setSelectedPostId} />;
     }
   };
 
+  const changeTab = (tab: AppTab) => {
+    setSelectedPostId(null);
+    setShowCreatePost(false);
+    setActiveTab(tab);
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <View style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <LinearGradient colors={["#E8E2D8", "#F0EBE3"]} style={styles.container}>
         <View style={styles.device}>
           {showSplash ? (
@@ -131,7 +171,7 @@ function AppShell() {
             </View>
           ) : (
             <>
-              {isAuthenticated ? (
+              {isAuthenticated && !showCreatePost ? (
                 <Text style={styles.logout} onPress={() => void logout()}>
                   Logout{user?.firstName ? ` · ${user.firstName}` : ""}
                 </Text>
@@ -155,14 +195,14 @@ function AppShell() {
                 </ScrollView>
               )}
 
-              {isAuthenticated && authRoute !== "reset" ? (
-                <TabBar activeTab={activeTab} onChange={setActiveTab} />
+              {isAuthenticated && authRoute !== "reset" && !showCreatePost ? (
+                <TabBar activeTab={activeTab} onChange={changeTab} />
               ) : null}
             </>
           )}
         </View>
       </LinearGradient>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -186,13 +226,15 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "stretch",
+    justifyContent: "flex-start",
     padding: 0,
   },
   device: {
+    position: "relative",
+    flex: 1,
     width: "100%",
-    height: "100%",
+    minHeight: "100%",
     backgroundColor: colors.cream,
     borderRadius: 0,
     overflow: "hidden",
@@ -218,20 +260,26 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: colors.cream,
   },
   tabScreen: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: colors.cream,
+    overflow: "hidden",
+    paddingTop: AUTHENTICATED_TOP_SPACE,
+    paddingBottom: 76,
   },
   screenContent: {
+    flexGrow: 1,
     padding: 12,
     paddingTop: 18,
     paddingBottom: 20,
   },
   logout: {
     position: "absolute",
-    top: 14,
+    top: AUTHENTICATED_TOP_SPACE + 10,
     right: 18,
     zIndex: 12,
     color: colors.burgundy,

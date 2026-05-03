@@ -1,0 +1,52 @@
+HomeFeedScreen - modifications du 2026-05-03 - actions du post
+
+Objectif:
+- Completer les actions du poster de post dans le feed.
+- Rendre les trois points fonctionnels.
+- Rendre le bouton de partage fonctionnel.
+- Persister le compteur de partage dans MongoDB via le backend FastAPI.
+
+Fichiers modifies:
+- mobile/src/screens/HomeFeedScreen.tsx
+- mobile/src/types/contracts.ts
+- mobile/src/services/types.ts
+- mobile/src/services/api/apiClient.ts
+- mobile/src/services/mock/mockClient.ts
+- mobile/src/services/mock/mockData.ts
+- backend/app/schemas/contracts.py
+- backend/app/modules/social/router.py
+- backend/app/modules/social/service.py
+- backend/app/db/session.py
+
+Logique ajoutee dans HomeFeedScreen:
+- Ajout du champ shareCount dans le type local FeedPost.
+- Mapping du champ API share_count vers shareCount.
+- Ajout de l'etat actionPost pour savoir quelle publication est ouverte dans le menu.
+- Le bouton trois points ouvre une feuille d'actions.
+- Le bouton partage ouvre le partage natif React Native avec Share.share.
+- Apres un partage non annule, appel API POST /posts/{post_id}/share si l'utilisateur est connecte.
+- Mise a jour du post dans le feed apres reponse backend.
+- Ajout d'une action masquer cette publication, locale au feed.
+- Ajout d'une action signaler avec alerte utilisateur.
+
+Actions disponibles depuis les trois points:
+- Voir la publication.
+- Partager.
+- Enregistrer / Retirer des enregistrements.
+- Masquer cette publication.
+- Signaler.
+- Annuler.
+
+Backend ajoute pour le partage:
+- Ajout du champ share_count dans PostDTO.
+- Ajout de la collection MongoDB post_shares.
+- Ajout des indexes post_shares_post_created_at et post_shares_user_created_at.
+- Ajout du service register_share.
+- Ajout de la route POST /api/v1/posts/{post_id}/share.
+
+Verification effectuee:
+- npm run typecheck dans mobile: OK.
+- Import backend sans ecriture pycache: OK.
+- Test HTTP local:
+  POST /api/v1/posts/{post_id}/share retourne un share_count mis a jour.
+

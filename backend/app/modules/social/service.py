@@ -1,20 +1,27 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException, status
+from pymongo.errors import DuplicateKeyError
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.schemas.contracts import (
+    AddCommentInput,
+    CommentDTO,
     CreatePostInput,
+    CreateStoryInput,
     PollDTO,
     PollOptionDTO,
     PostDTO,
+    StoryDTO,
     UserDTO,
 )
 
 PostDocument = dict[str, Any]
 UserDocument = dict[str, Any]
+CommentDocument = dict[str, Any]
+StoryDocument = dict[str, Any]
 
 
 def utc_now() -> datetime:
@@ -26,6 +33,119 @@ def normalize_hashtag(tag: str) -> str:
     if not value:
         return value
     return value if value.startswith("#") else f"#{value}"
+
+
+def normalize_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+
+    if isinstance(value, str):
+        normalized = value.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return utc_now()
+
+    return utc_now()
+
+
+def normalize_string_list(value: Any, *, hashtags: bool = False) -> list[str]:
+    if value is None:
+        return []
+
+    raw_items = value if isinstance(value, list) else [value]
+    normalized_items: list[str] = []
+
+    for item in raw_items:
+        if isinstance(item, str):
+            parts = item.split() if hashtags and " " in item else [item]
+        elif isinstance(item, dict):
+            preferred_keys = ("type", "color", "style", "label", "name", "value")
+            values = [str(item[key]).strip() for key in preferred_keys if item.get(key)]
+            parts = [" ".join(values)] if values else [str(item)]
+        else:
+            parts = [str(item)]
+
+        for part in parts:
+            text = part.strip()
+            if not text:
+                continue
+            normalized_items.append(normalize_hashtag(text) if hashtags else text)
+
+    return normalized_items
+
+
+def normalize_image_urls(post: PostDocument) -> list[str]:
+    candidate = (
+        post.get("image_urls")
+        or post.get("video_urls")
+        or post.get("videos")
+        or post.get("images")
+        or post.get("media")
+        or post.get("video_url")
+        or post.get("image_url")
+        or post.get("video")
+        or post.get("image")
+    )
+    if candidate is None:
+        return []
+
+    raw_items = candidate if isinstance(candidate, list) else [candidate]
+    image_urls: list[str] = []
+
+    for item in raw_items:
+        if isinstance(item, str):
+            url = item.strip()
+        elif isinstance(item, dict):
+            url = str(
+                item.get("url")
+                or item.get("image_url")
+                or item.get("video_url")
+                or item.get("image")
+                or item.get("video")
+                or item.get("src")
+                or ""
+            ).strip()
+        else:
+            url = ""
+
+        if url:
+            image_urls.append(url)
+
+    return image_urls
+
+
+def safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def detect_media_type(post: PostDocument) -> str:
+    explicit = str(post.get("media_type") or post.get("type") or post.get("kind") or "").lower()
+    if explicit in {"video", "reel"}:
+        return "video"
+
+    if post.get("video_url") or post.get("video") or post.get("video_urls") or post.get("videos"):
+        return "video"
+
+    media = post.get("media")
+    media_items = media if isinstance(media, list) else [media] if media else []
+    for item in media_items:
+        if isinstance(item, dict):
+            item_type = str(item.get("type") or item.get("media_type") or item.get("kind") or "").lower()
+            url = str(item.get("url") or item.get("src") or item.get("video_url") or "").lower()
+            if item_type in {"video", "reel"} or url.endswith((".mp4", ".mov", ".m4v", ".webm")):
+                return "video"
+        elif isinstance(item, str) and item.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
+            return "video"
+
+    for url in normalize_image_urls(post):
+        if url.lower().split("?")[0].endswith((".mp4", ".mov", ".m4v", ".webm")):
+            return "video"
+
+    return "image"
 
 
 def user_to_dto(user: UserDocument | None, fallback_id: str) -> UserDTO:
@@ -54,9 +174,19 @@ async def post_to_dto(
     post: PostDocument,
     current_user_id: str | None = None,
 ) -> PostDTO:
+    post_id = str(post.get("id") or post.get("_id"))
     author_id = str(post.get("author_id"))
     author = await db.users.find_one({"_id": author_id})
     like_user_ids = [str(item) for item in post.get("like_user_ids", [])]
+    actual_comment_count = await db.comments.count_documents({"post_id": post_id})
+    actual_share_count = await db.post_shares.count_documents({"post_id": post_id})
+    saved_by_me = False
+    if current_user_id:
+        saved_by_me = bool(
+            await db.saved_posts.find_one(
+                {"user_id": current_user_id, "post_id": post_id}
+            )
+        )
     poll = post.get("poll")
     poll_dto = None
 
@@ -65,10 +195,11 @@ async def post_to_dto(
             PollOptionDTO(
                 id=str(option.get("id")),
                 label=str(option.get("label", "")),
-                image_url=str(option.get("image_url", "")),
-                votes=int(option.get("votes", 0)),
+                image_url=str(option.get("image_url") or option.get("image") or option.get("url") or ""),
+                votes=safe_int(option.get("votes")),
             )
             for option in poll.get("options", [])
+            if isinstance(option, dict)
         ]
         poll_dto = PollDTO(
             id=str(poll.get("id")),
@@ -77,17 +208,55 @@ async def post_to_dto(
         )
 
     return PostDTO(
-        id=str(post.get("id") or post.get("_id")),
+        id=post_id,
         author=user_to_dto(author, author_id),
-        caption=str(post.get("caption", "")),
-        hashtags=list(post.get("hashtags", [])),
-        garment_tags=list(post.get("garment_tags", [])),
-        image_urls=list(post.get("image_urls", [])),
+        caption=str(post.get("caption") or post.get("description") or ""),
+        media_type=detect_media_type(post),
+        hashtags=normalize_string_list(post.get("hashtags"), hashtags=True),
+        garment_tags=normalize_string_list(post.get("garment_tags") or post.get("tags")),
+        image_urls=normalize_image_urls(post),
         like_count=len(like_user_ids),
-        comment_count=int(post.get("comment_count", 0)),
+        comment_count=actual_comment_count,
+        share_count=actual_share_count or safe_int(post.get("share_count")),
         liked_by_me=bool(current_user_id and current_user_id in like_user_ids),
-        created_at=post.get("created_at") or utc_now(),
+        saved_by_me=saved_by_me,
+        created_at=normalize_datetime(post.get("created_at")),
         poll=poll_dto,
+    )
+
+
+async def comment_to_dto(db: AsyncIOMotorDatabase, comment: CommentDocument) -> CommentDTO:
+    author_id = str(comment.get("author_id"))
+    author = await db.users.find_one({"_id": author_id})
+    return CommentDTO(
+        id=str(comment.get("id") or comment.get("_id")),
+        author=user_to_dto(author, author_id),
+        content=str(comment.get("content", "")),
+        created_at=normalize_datetime(comment.get("created_at")),
+    )
+
+
+async def story_to_dto(
+    db: AsyncIOMotorDatabase,
+    story: StoryDocument,
+    current_user_id: str | None = None,
+) -> StoryDTO:
+    story_id = str(story.get("id") or story.get("_id"))
+    author_id = str(story.get("author_id"))
+    author = await db.users.find_one({"_id": author_id})
+    viewed_user_ids = [str(item) for item in story.get("viewed_user_ids", [])]
+    external_viewer_ids = [viewer_id for viewer_id in viewed_user_ids if viewer_id != author_id]
+
+    return StoryDTO(
+        id=story_id,
+        author=user_to_dto(author, author_id),
+        media_url=str(story.get("media_url") or ""),
+        media_type="video" if str(story.get("media_type")).lower() == "video" else "image",
+        caption=story.get("caption"),
+        viewer_count=len(external_viewer_ids),
+        viewed_by_me=bool(current_user_id and current_user_id in viewed_user_ids),
+        created_at=normalize_datetime(story.get("created_at")),
+        expires_at=normalize_datetime(story.get("expires_at")),
     )
 
 
@@ -107,6 +276,31 @@ async def list_feed_posts(
     return [await post_to_dto(db, post, current_user_id) for post in documents]
 
 
+async def list_reels_posts(
+    db: AsyncIOMotorDatabase,
+    current_user_id: str | None,
+    limit: int,
+    offset: int,
+) -> list[PostDTO]:
+    # Imported Mongo data is not fully normalized yet, so reels are detected from
+    # explicit media_type/type fields and common video URL fields.
+    query: dict[str, Any] = {
+        "$or": [
+            {"media_type": {"$in": ["video", "reel"]}},
+            {"type": {"$in": ["video", "reel"]}},
+            {"kind": {"$in": ["video", "reel"]}},
+            {"video_url": {"$exists": True, "$ne": ""}},
+            {"video_urls": {"$exists": True, "$ne": []}},
+            {"videos": {"$exists": True, "$ne": []}},
+        ]
+    }
+    cursor = db.posts.find(query).sort("created_at", -1)
+    documents = await cursor.to_list(length=max(limit + offset, limit))
+    reels = [post for post in documents if detect_media_type(post) == "video"]
+    page = reels[offset : offset + limit]
+    return [await post_to_dto(db, post, current_user_id) for post in page]
+
+
 async def create_post(
     db: AsyncIOMotorDatabase,
     payload: CreatePostInput,
@@ -121,6 +315,7 @@ async def create_post(
         "id": post_id,
         "author_id": str(current_user["_id"]),
         "caption": payload.caption.strip(),
+        "media_type": payload.media_type,
         "hashtags": hashtags,
         "garment_tags": [tag.strip() for tag in payload.garment_tags if tag.strip()],
         "image_urls": [url.strip() for url in payload.image_urls if url.strip()],
@@ -140,6 +335,106 @@ async def create_post(
     return await post_to_dto(db, post, str(current_user["_id"]))
 
 
+async def list_stories(
+    db: AsyncIOMotorDatabase,
+    current_user_id: str | None,
+    limit: int,
+) -> list[StoryDTO]:
+    now = utc_now()
+    query: dict[str, Any] = {
+        "$or": [
+            {"expires_at": {"$gt": now}},
+            {"expires_at": {"$exists": False}},
+        ]
+    }
+    cursor = db.stories.find(query).sort("created_at", -1).limit(limit)
+    stories = await cursor.to_list(length=limit)
+    return [await story_to_dto(db, story, current_user_id) for story in stories]
+
+
+async def create_story(
+    db: AsyncIOMotorDatabase,
+    payload: CreateStoryInput,
+    current_user: UserDocument,
+) -> StoryDTO:
+    media_url = payload.media_url.strip()
+    if not media_url:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Story media URL is required",
+        )
+
+    now = utc_now()
+    story_id = str(uuid4())
+    story: StoryDocument = {
+        "_id": story_id,
+        "id": story_id,
+        "author_id": str(current_user["_id"]),
+        "media_url": media_url,
+        "media_type": payload.media_type,
+        "caption": payload.caption.strip() if payload.caption else None,
+        "viewed_user_ids": [],
+        "created_at": now,
+        "updated_at": now,
+        "expires_at": now + timedelta(hours=24),
+    }
+
+    await db.stories.insert_one(story)
+    return await story_to_dto(db, story, str(current_user["_id"]))
+
+
+async def mark_story_viewed(
+    db: AsyncIOMotorDatabase,
+    story_id: str,
+    current_user: UserDocument,
+) -> StoryDTO:
+    user_id = str(current_user["_id"])
+    story = await db.stories.find_one({"_id": story_id})
+    if not story:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Story not found")
+
+    if str(story.get("author_id")) == user_id:
+        return await story_to_dto(db, story, user_id)
+
+    await db.stories.update_one(
+        {"_id": story_id},
+        {"$addToSet": {"viewed_user_ids": user_id}, "$set": {"updated_at": utc_now()}},
+    )
+    updated = await db.stories.find_one({"_id": story_id})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Story not found")
+    return await story_to_dto(db, updated, user_id)
+
+
+async def list_story_viewers(
+    db: AsyncIOMotorDatabase,
+    story_id: str,
+    current_user: UserDocument,
+) -> list[UserDTO]:
+    user_id = str(current_user["_id"])
+    story = await db.stories.find_one({"_id": story_id})
+    if not story:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Story not found")
+    if str(story.get("author_id")) != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the story owner can see viewers",
+        )
+
+    viewer_ids = [str(item) for item in story.get("viewed_user_ids", []) if str(item) != user_id]
+    if not viewer_ids:
+        return []
+
+    cursor = db.users.find({"_id": {"$in": viewer_ids}})
+    users = await cursor.to_list(length=len(viewer_ids))
+    user_by_id = {str(user.get("_id")): user for user in users}
+
+    return [
+        user_to_dto(user_by_id.get(viewer_id), viewer_id)
+        for viewer_id in viewer_ids
+    ]
+
+
 async def get_post(
     db: AsyncIOMotorDatabase,
     post_id: str,
@@ -149,6 +444,51 @@ async def get_post(
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     return await post_to_dto(db, post, current_user_id)
+
+
+async def list_post_comments(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    limit: int,
+    offset: int,
+) -> list[CommentDTO]:
+    cursor = (
+        db.comments.find({"post_id": post_id})
+        .sort("created_at", 1)
+        .skip(offset)
+        .limit(limit)
+    )
+    comments = await cursor.to_list(length=limit)
+    return [await comment_to_dto(db, comment) for comment in comments]
+
+
+async def add_post_comment(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    payload: AddCommentInput,
+    current_user: UserDocument,
+) -> CommentDTO:
+    post = await db.posts.find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    now = utc_now()
+    comment_id = str(uuid4())
+    comment: CommentDocument = {
+        "_id": comment_id,
+        "id": comment_id,
+        "post_id": post_id,
+        "author_id": str(current_user["_id"]),
+        "content": payload.content.strip(),
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.comments.insert_one(comment)
+    await db.posts.update_one(
+        {"_id": post_id},
+        {"$inc": {"comment_count": 1}, "$set": {"updated_at": now}},
+    )
+    return await comment_to_dto(db, comment)
 
 
 async def toggle_like(
@@ -177,3 +517,98 @@ async def toggle_like(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     return await post_to_dto(db, updated, user_id)
+
+
+async def register_share(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    current_user: UserDocument,
+) -> PostDTO:
+    post = await db.posts.find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    now = utc_now()
+    share_id = str(uuid4())
+    await db.post_shares.insert_one(
+        {
+            "_id": share_id,
+            "id": share_id,
+            "post_id": post_id,
+            "user_id": str(current_user["_id"]),
+            "created_at": now,
+        }
+    )
+    await db.posts.update_one(
+        {"_id": post_id},
+        {"$inc": {"share_count": 1}, "$set": {"updated_at": now}},
+    )
+
+    updated = await db.posts.find_one({"_id": post_id})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return await post_to_dto(db, updated, str(current_user["_id"]))
+
+
+async def toggle_save(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    current_user: UserDocument,
+) -> PostDTO:
+    user_id = str(current_user["_id"])
+    post = await db.posts.find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    existing = await db.saved_posts.find_one({"user_id": user_id, "post_id": post_id})
+    if existing:
+        await db.saved_posts.delete_one({"_id": existing["_id"]})
+    else:
+        media_type = detect_media_type(post)
+        try:
+            await db.saved_posts.insert_one(
+                {
+                    "_id": f"{user_id}:{post_id}",
+                    "id": f"{user_id}:{post_id}",
+                    "user_id": user_id,
+                    "post_id": post_id,
+                    "media_type": media_type,
+                    "created_at": utc_now(),
+                }
+            )
+        except DuplicateKeyError:
+            pass
+
+    updated = await db.posts.find_one({"_id": post_id})
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+    return await post_to_dto(db, updated, user_id)
+
+
+async def list_saved_posts(
+    db: AsyncIOMotorDatabase,
+    current_user: UserDocument,
+    media_type: str | None,
+    limit: int,
+    offset: int,
+) -> list[PostDTO]:
+    user_id = str(current_user["_id"])
+    query: dict[str, Any] = {"user_id": user_id}
+    if media_type in {"image", "video"}:
+        query["media_type"] = media_type
+
+    cursor = (
+        db.saved_posts.find(query)
+        .sort("created_at", -1)
+        .skip(offset)
+        .limit(limit)
+    )
+    saved_items = await cursor.to_list(length=limit)
+    posts: list[PostDTO] = []
+
+    for saved_item in saved_items:
+        post = await db.posts.find_one({"_id": str(saved_item.get("post_id"))})
+        if post:
+            posts.append(await post_to_dto(db, post, user_id))
+
+    return posts

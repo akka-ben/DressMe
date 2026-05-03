@@ -1,0 +1,47 @@
+[
+  {
+    "_id": "conv-0001",
+    "id": "conv-0001",
+    "participants": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "a1b2c3d4-1111-2222-3333-444455556666"],
+    "is_group": false,
+    "group_name": null,
+    "last_message_at": "2026-05-02T15:30:00.000+00:00",
+    "created_at": "2026-04-20T10:00:00.000+00:00"
+  },
+  {
+    "_id": "conv-0002",
+    "id": "conv-0002",
+    "participants": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "b2c3d4e5-2222-3333-4444-555566667777"],
+    "is_group": false,
+    "group_name": null,
+    "last_message_at": "2026-05-01T20:15:00.000+00:00",
+    "created_at": "2026-04-22T14:00:00.000+00:00"
+  },
+  {
+    "_id": "conv-0003",
+    "id": "conv-0003",
+    "participants": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "a1b2c3d4-1111-2222-3333-444455556666", "b2c3d4e5-2222-3333-4444-555566667777", "d4e5f6a7-4444-5555-6666-777788889999"],
+    "is_group": true,
+    "group_name": "Fashion Squad Fes",
+    "last_message_at": "2026-05-02T18:00:00.000+00:00",
+    "created_at": "2026-04-25T09:00:00.000+00:00"
+  },
+  {
+    "_id": "conv-0004",
+    "id": "conv-0004",
+    "participants": ["a1b2c3d4-1111-2222-3333-444455556666", "e5f6a7b8-5555-6666-7777-888899990000"],
+    "is_group": false,
+    "group_name": null,
+    "last_message_at": "2026-05-01T16:45:00.000+00:00",
+    "created_at": "2026-04-28T11:00:00.000+00:00"
+  },
+  {
+    "_id": "conv-0005",
+    "id": "conv-0005",
+    "participants": ["c3d4e5f6-3333-4444-5555-666677778888", "b2c3d4e5-2222-3333-4444-555566667777", "e5f6a7b8-5555-6666-7777-888899990000"],
+    "is_group": true,
+    "group_name": "Vintage Hunters",
+    "last_message_at": "2026-05-02T12:30:00.000+00:00",
+    "created_at": "2026-04-26T15:00:00.000+00:00"
+  }
+]

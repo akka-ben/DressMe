@@ -1,0 +1,45 @@
+HomeFeedScreen - correction style hauteur - 2026-05-03
+
+Objectif:
+- Ajuster uniquement les styles pour que la page occupe toute la hauteur disponible.
+- Eviter que le feed se comporte comme un bloc centre ou incomplet en hauteur.
+
+Fichiers modifies:
+- mobile/App.tsx
+- mobile/src/screens/HomeFeedScreen.tsx
+- mobile/src/components/TabBar.tsx
+
+Modifications de style:
+- App wrapper:
+  - remplacement du SafeAreaView global par un View plein ecran.
+  - StatusBar transparente pour ne plus reserver une marge systeme globale.
+- App container:
+  - alignItems passe a stretch.
+  - justifyContent passe a flex-start.
+- App device:
+  - ajout de flex: 1.
+  - ajout de position: relative pour permettre a la tab bar d'etre ancree en bas.
+  - remplacement de height: 100% par minHeight: 100%.
+- App screen/tabScreen:
+  - ajout de minHeight: 0 pour laisser le contenu scrollable calculer la hauteur correctement.
+  - ajout de overflow: hidden sur tabScreen.
+  - ajout d'un paddingTop safe-area pour eviter que le notch/status bar recouvre le header.
+  - repositionnement du bouton Logout sous cette marge haute.
+- TabBar:
+  - position absolute.
+  - ancrage bottom: 0, left: 0, right: 0.
+  - zIndex pour rester au-dessus du contenu.
+  - hauteur minimale et padding bottom ajustes.
+- Auth screenContent:
+  - ajout de flexGrow: 1.
+- HomeFeedScreen shell:
+  - ajout de minHeight: 100%.
+  - ajout du background cream.
+- HomeFeedScreen FlatList:
+  - ajout du style feedList avec flex: 1.
+  - ajout de flexGrow: 1 dans contentContainerStyle.
+
+Logique modifiee:
+- Aucune logique metier modifiee.
+- Aucun endpoint modifie.
+- Aucun changement backend.

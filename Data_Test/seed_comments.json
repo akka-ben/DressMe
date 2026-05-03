@@ -1,0 +1,218 @@
+[
+  {
+    "_id": "cmt-0001",
+    "id": "cmt-0001",
+    "post_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "text": "Waaah Amina ce caftan est magnifique! La couleur te va trop bien.",
+    "created_at": "2026-04-28T15:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0002",
+    "id": "cmt-0002",
+    "post_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "text": "J'adore! Tu l'as trouvé où?",
+    "created_at": "2026-04-28T15:30:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0003",
+    "id": "cmt-0003",
+    "post_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "text": "Perfect pour un mariage. Les babouches gold c'est le detail qui tue.",
+    "created_at": "2026-04-28T16:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0004",
+    "id": "cmt-0004",
+    "post_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "text": "Le hoodie oversized c'est la base. Quelle marque?",
+    "created_at": "2026-04-21T10:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0005",
+    "id": "cmt-0005",
+    "post_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0003",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "text": "Classique! Tu peux jamais te tromper avec une LBD.",
+    "created_at": "2026-04-15T21:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0006",
+    "id": "cmt-0006",
+    "post_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0003",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "text": "Ajoute un clutch doré et t'es parfaite.",
+    "created_at": "2026-04-16T08:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0007",
+    "id": "cmt-0007",
+    "post_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "text": "Fire! Les Military Black sont clean.",
+    "created_at": "2026-04-30T12:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0008",
+    "id": "cmt-0008",
+    "post_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "text": "Tu les as eu retail ou resell?",
+    "created_at": "2026-04-30T12:30:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0009",
+    "id": "cmt-0009",
+    "post_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "text": "Le fit complet est propre. Jogger noir + J4 c'est le combo parfait.",
+    "created_at": "2026-04-30T14:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0010",
+    "id": "cmt-0010",
+    "post_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "text": "Moi je préfère les J4 en blanc perso, mais celles-ci sont pas mal.",
+    "created_at": "2026-05-01T09:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0011",
+    "id": "cmt-0011",
+    "post_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "text": "Summer ready! Les espadrilles ajoutent la touche parfaite.",
+    "created_at": "2026-04-25T18:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0012",
+    "id": "cmt-0012",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "text": "Sara tu gères toujours! Le camel coat est une pièce incontournable.",
+    "created_at": "2026-05-01T10:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0013",
+    "id": "cmt-0013",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "text": "Classe et confortable en même temps. Respect.",
+    "created_at": "2026-05-01T10:30:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0014",
+    "id": "cmt-0014",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "text": "Je veux le même coat! C'est quelle marque?",
+    "created_at": "2026-05-01T11:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0015",
+    "id": "cmt-0015",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "text": "Les sneakers blanches avec le hijab cream c'est un match parfait.",
+    "created_at": "2026-05-01T12:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0016",
+    "id": "cmt-0016",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "text": "Inspo hijab au top comme toujours.",
+    "created_at": "2026-05-02T08:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0017",
+    "id": "cmt-0017",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "text": "La ceinture dorée fait toute la différence!",
+    "created_at": "2026-04-22T20:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0018",
+    "id": "cmt-0018",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "text": "Magnifique pour un iftar. L'abaya navy est très élégante.",
+    "created_at": "2026-04-23T07:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0019",
+    "id": "cmt-0019",
+    "post_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0003",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "text": "Beach vibes! La turquoise te va super bien.",
+    "created_at": "2026-04-12T16:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0020",
+    "id": "cmt-0020",
+    "post_id": "d4444444-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "text": "Karim le roi du vintage! Cette veste est une pépite.",
+    "created_at": "2026-04-29T11:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0021",
+    "id": "cmt-0021",
+    "post_id": "d4444444-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "text": "Le cuir vintage > le cuir neuf. Change my mind.",
+    "created_at": "2026-04-29T12:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0022",
+    "id": "cmt-0022",
+    "post_id": "d4444444-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "text": "Tu l'as payé combien au souk? Je cherche une veste similaire.",
+    "created_at": "2026-04-30T08:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0023",
+    "id": "cmt-0023",
+    "post_id": "d4444444-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "text": "70s vibes! La chemise à fleurs avec le pantalon large c'est cool.",
+    "created_at": "2026-04-20T18:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0024",
+    "id": "cmt-0024",
+    "post_id": "e5555555-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "text": "Le chapeau de paille c'est la touche bohème parfaite!",
+    "created_at": "2026-05-02T09:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0025",
+    "id": "cmt-0025",
+    "post_id": "e5555555-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "text": "Marrakech goals! La terracotta c'est THE couleur de cet été.",
+    "created_at": "2026-05-02T10:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0026",
+    "id": "cmt-0026",
+    "post_id": "f6666666-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "text": "Le polo fitted c'est sous-coté. Clean look bro.",
+    "created_at": "2026-04-27T19:00:00.000+00:00"
+  },
+  {
+    "_id": "cmt-0027",
+    "id": "cmt-0027",
+    "post_id": "f6666666-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "text": "Gym to street c'est un art. Tu le maitrises bien Omar.",
+    "created_at": "2026-04-28T08:00:00.000+00:00"
+  }
+]

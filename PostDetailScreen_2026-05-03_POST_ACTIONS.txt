@@ -1,0 +1,43 @@
+PostDetailScreen - modifications du 2026-05-03 - actions du post
+
+Objectif:
+- Completer les actions du post dans l'ecran detail.
+- Rendre les trois points fonctionnels.
+- Rendre le bouton de partage fonctionnel.
+- Garder une logique proche d'Instagram: detail, commentaires, partage, sauvegarde, signalement.
+
+Fichier principal modifie:
+- mobile/src/screens/PostDetailScreen.tsx
+
+Logique ajoutee dans PostDetailScreen:
+- Ajout d'un etat menuVisible pour controler la feuille d'actions.
+- Le bouton trois points dans la top bar ouvre le menu.
+- Le bouton trois points dans le header du post ouvre le meme menu.
+- Le bouton de partage ouvre Share.share avec le texte, hashtags et URL media du post.
+- Apres un partage non annule, appel API POST /posts/{post_id}/share.
+- Mise a jour du post detail avec le nouveau shareCount retourne par le backend.
+- Affichage du compteur de partage lorsque shareCount > 0.
+- Action Enregistrer / Retirer conserve la logique existante de sauvegarde MongoDB.
+- Action Actualiser recharge le post et ses commentaires.
+- Action Signaler affiche une confirmation locale.
+
+Actions disponibles depuis les trois points:
+- Partager.
+- Enregistrer / Retirer des enregistrements.
+- Actualiser.
+- Signaler.
+- Annuler.
+
+Backend/API utilise:
+- POST /api/v1/posts/{post_id}/share
+- POST /api/v1/posts/{post_id}/save
+- GET /api/v1/posts/{post_id}
+- GET /api/v1/posts/{post_id}/comments
+- POST /api/v1/posts/{post_id}/comments
+
+Verification effectuee:
+- npm run typecheck dans mobile: OK.
+- Import backend sans ecriture pycache: OK.
+- Test HTTP local:
+  POST /api/v1/posts/{post_id}/share retourne un share_count mis a jour.
+

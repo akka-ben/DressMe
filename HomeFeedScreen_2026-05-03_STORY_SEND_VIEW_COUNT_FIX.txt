@@ -1,0 +1,32 @@
+HomeFeedScreen - 2026-05-03 - Correction Send Story et compteur vues
+
+Problemes corriges:
+- Le bouton Mention et le bouton Envoyer ouvraient le meme sheet "Mention".
+- Le compteur affichait 1 vue meme quand aucun viewer externe n'existait.
+
+Corrections backend:
+- viewer_count exclut maintenant le proprietaire de la story.
+- Si le proprietaire ouvre sa propre story, il n'est pas ajoute dans viewed_user_ids.
+- La liste des viewers continue d'exclure le proprietaire.
+
+Corrections mobile:
+- Mention ouvre toujours le sheet:
+  - Titre: Mention
+  - Sous-titre: Choisir parmi tes followers
+  - Action: Mentionner
+- Envoyer ouvre maintenant un sheet different:
+  - Titre: Envoyer a
+  - Sous-titre: Choisir les destinataires
+  - Action: Envoyer
+- Le sheet Activite affiche maintenant le nombre reel de viewers charges.
+- L'etat vide affiche 0 vue quand la liste est vide.
+- Le timer story se pause aussi pendant le sheet Envoyer.
+
+Verification:
+- npm run typecheck: OK.
+- Backend imports: OK.
+- git diff --check: OK.
+
+Important:
+- Redemarrer le backend pour appliquer le nouveau calcul viewer_count.
+- Rafraichir le feed mobile pour recharger les stories avec le compteur corrige.

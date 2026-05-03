@@ -1,0 +1,272 @@
+[
+  {
+    "_id": "msg-0001",
+    "id": "msg-0001",
+    "conversation_id": "conv-0001",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Salam Youssef! T'as vu le blazer que j'ai posté?",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T14:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0002",
+    "id": "msg-0002",
+    "conversation_id": "conv-0001",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "Oui j'ai liké! Il est top. Tu l'as pris où?",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T14:05:00.000+00:00"
+  },
+  {
+    "_id": "msg-0003",
+    "id": "msg-0003",
+    "conversation_id": "conv-0001",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Zara Fes, en solde! 350dh seulement.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T14:10:00.000+00:00"
+  },
+  {
+    "_id": "msg-0004",
+    "id": "msg-0004",
+    "conversation_id": "conv-0001",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "Waaah deal! J'y passe demain. Tu penses quoi de le combiner avec un chino beige?",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T14:15:00.000+00:00"
+  },
+  {
+    "_id": "msg-0005",
+    "id": "msg-0005",
+    "conversation_id": "conv-0001",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Ouiii ça match grave! Essaie avec des mocassins aussi.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T14:20:00.000+00:00"
+  },
+  {
+    "_id": "msg-0006",
+    "id": "msg-0006",
+    "conversation_id": "conv-0001",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "https://picsum.photos/seed/mocassin1/400/400",
+    "type": "image",
+    "status": "read",
+    "created_at": "2026-05-02T15:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0007",
+    "id": "msg-0007",
+    "conversation_id": "conv-0001",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "Genre ceux-là? J'hésite entre marron et noir.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T15:01:00.000+00:00"
+  },
+  {
+    "_id": "msg-0008",
+    "id": "msg-0008",
+    "conversation_id": "conv-0001",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Marron 100%! Ça casse le total look sombre et ça fait plus chaud.",
+    "type": "text",
+    "status": "delivered",
+    "created_at": "2026-05-02T15:30:00.000+00:00"
+  },
+  {
+    "_id": "msg-0009",
+    "id": "msg-0009",
+    "conversation_id": "conv-0002",
+    "sender_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "content": "Amina! J'ai besoin de ton avis sur une abaya que j'ai trouvé.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T19:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0010",
+    "id": "msg-0010",
+    "conversation_id": "conv-0002",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Envoie la photo! Tu sais que j'adore les abayas.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T19:05:00.000+00:00"
+  },
+  {
+    "_id": "msg-0011",
+    "id": "msg-0011",
+    "conversation_id": "conv-0002",
+    "sender_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "content": "https://picsum.photos/seed/abaya2/400/600",
+    "type": "image",
+    "status": "read",
+    "created_at": "2026-05-01T19:10:00.000+00:00"
+  },
+  {
+    "_id": "msg-0012",
+    "id": "msg-0012",
+    "conversation_id": "conv-0002",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Magnifique! La broderie est superbe. Prends-la sans hésiter.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T19:20:00.000+00:00"
+  },
+  {
+    "_id": "msg-0013",
+    "id": "msg-0013",
+    "conversation_id": "conv-0002",
+    "sender_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "content": "Tu penses que je la mets avec le hijab doré ou le cream?",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T19:30:00.000+00:00"
+  },
+  {
+    "_id": "msg-0014",
+    "id": "msg-0014",
+    "conversation_id": "conv-0002",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Cream pour le quotidien, doré pour les occasions. Les deux marchent!",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T20:15:00.000+00:00"
+  },
+  {
+    "_id": "msg-0015",
+    "id": "msg-0015",
+    "conversation_id": "conv-0003",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "Salaam la team! Qui vient au souk demain? Je cherche des accessoires.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T16:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0016",
+    "id": "msg-0016",
+    "conversation_id": "conv-0003",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "Moi je suis dispo! Je veux checker les sneakers aussi.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T16:10:00.000+00:00"
+  },
+  {
+    "_id": "msg-0017",
+    "id": "msg-0017",
+    "conversation_id": "conv-0003",
+    "sender_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "content": "Je peux pas demain mais faites un appel vidéo quand vous y êtes!",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T16:20:00.000+00:00"
+  },
+  {
+    "_id": "msg-0018",
+    "id": "msg-0018",
+    "conversation_id": "conv-0003",
+    "sender_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "content": "Bonne idée Sara! Comme ça je vous montre les options en live.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T16:30:00.000+00:00"
+  },
+  {
+    "_id": "msg-0019",
+    "id": "msg-0019",
+    "conversation_id": "conv-0003",
+    "sender_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "content": "On fait ça! Help Me Choose en live haha. RDV 10h au souk.",
+    "type": "text",
+    "status": "delivered",
+    "created_at": "2026-05-02T18:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0020",
+    "id": "msg-0020",
+    "conversation_id": "conv-0004",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "Omar! T'as un bon plan pour des polos fitted?",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T15:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0021",
+    "id": "msg-0021",
+    "conversation_id": "conv-0004",
+    "sender_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "content": "Ralph Lauren outlet à Tanger Med. Prix imbattables.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T15:30:00.000+00:00"
+  },
+  {
+    "_id": "msg-0022",
+    "id": "msg-0022",
+    "conversation_id": "conv-0004",
+    "sender_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "content": "Merci bro! Je check ce weekend inchallah.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-01T16:45:00.000+00:00"
+  },
+  {
+    "_id": "msg-0023",
+    "id": "msg-0023",
+    "conversation_id": "conv-0005",
+    "sender_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "content": "Les gars j'ai trouvé un lot de chemises 70s au souk de Rabat!",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T11:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0024",
+    "id": "msg-0024",
+    "conversation_id": "conv-0005",
+    "sender_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "content": "Photos! Je cherche justement une chemise vintage pour cet été.",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T11:15:00.000+00:00"
+  },
+  {
+    "_id": "msg-0025",
+    "id": "msg-0025",
+    "conversation_id": "conv-0005",
+    "sender_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "content": "https://picsum.photos/seed/vintage70s/400/400",
+    "type": "image",
+    "status": "read",
+    "created_at": "2026-05-02T11:20:00.000+00:00"
+  },
+  {
+    "_id": "msg-0026",
+    "id": "msg-0026",
+    "conversation_id": "conv-0005",
+    "sender_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "content": "La deuxième en partant de la gauche est magnifique!",
+    "type": "text",
+    "status": "read",
+    "created_at": "2026-05-02T12:00:00.000+00:00"
+  },
+  {
+    "_id": "msg-0027",
+    "id": "msg-0027",
+    "conversation_id": "conv-0005",
+    "sender_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "content": "Je vous en garde chacun une? 80dh la pièce.",
+    "type": "text",
+    "status": "delivered",
+    "created_at": "2026-05-02T12:30:00.000+00:00"
+  }
+]

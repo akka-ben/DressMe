@@ -1,0 +1,261 @@
+[
+  {
+    "_id": "f07545bd-dda6-4703-87bf-2ee7ae108b33",
+    "id": "f07545bd-dda6-4703-87bf-2ee7ae108b33",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "caption": "Test reel Mongo depuis API: blazer burgundy et denim.",
+    "hashtags": ["#smartcasual", "#burgundy"],
+    "garment_tags": [
+      {"type": "blazer", "color": "burgundy", "style": "smart casual"},
+      {"type": "jeans", "color": "dark blue", "style": "slim"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/blazer1/600/800"],
+    "like_user_ids": ["a1b2c3d4-1111-2222-3333-444455556666"],
+    "comment_count": 0,
+    "created_at": "2026-05-01T19:46:40.260+00:00",
+    "updated_at": "2026-05-02T16:27:10.169+00:00"
+  },
+  {
+    "_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0001",
+    "id": "a1111111-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "caption": "Caftan revisité pour un mariage à Fes. Qu'en pensez-vous ?",
+    "hashtags": ["#caftan", "#mariage", "#traditionnel"],
+    "garment_tags": [
+      {"type": "caftan", "color": "emerald green", "style": "traditional"},
+      {"type": "babouches", "color": "gold", "style": "traditional"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/caftan1/600/800"],
+    "like_user_ids": ["a1b2c3d4-1111-2222-3333-444455556666", "b2c3d4e5-2222-3333-4444-555566667777", "d4e5f6a7-4444-5555-6666-777788889999", "e5f6a7b8-5555-6666-7777-888899990000"],
+    "comment_count": 3,
+    "created_at": "2026-04-28T14:20:00.000+00:00",
+    "updated_at": "2026-04-29T10:00:00.000+00:00"
+  },
+  {
+    "_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0002",
+    "id": "a1111111-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "caption": "Monday vibes: oversized hoodie + cargo pants.",
+    "hashtags": ["#streetwear", "#casual", "#monday"],
+    "garment_tags": [
+      {"type": "hoodie", "color": "beige", "style": "streetwear"},
+      {"type": "cargo pants", "color": "khaki", "style": "casual"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/hoodie1/600/800", "https://picsum.photos/seed/cargo1/600/800"],
+    "like_user_ids": ["a1b2c3d4-1111-2222-3333-444455556666", "c3d4e5f6-3333-4444-5555-666677778888"],
+    "comment_count": 1,
+    "created_at": "2026-04-21T08:30:00.000+00:00",
+    "updated_at": "2026-04-21T08:30:00.000+00:00"
+  },
+  {
+    "_id": "a1111111-aaaa-bbbb-cccc-ddddeeee0003",
+    "id": "a1111111-aaaa-bbbb-cccc-ddddeeee0003",
+    "author_id": "f76c1f42-57eb-46bc-aa9b-e6248db00c6f",
+    "caption": "Soirée look: robe noire et talons. Classique mais efficace.",
+    "hashtags": ["#soiree", "#elegant", "#littleblackdress"],
+    "garment_tags": [
+      {"type": "dress", "color": "black", "style": "evening"},
+      {"type": "heels", "color": "black", "style": "classic"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/dress1/600/800"],
+    "like_user_ids": ["b2c3d4e5-2222-3333-4444-555566667777", "d4e5f6a7-4444-5555-6666-777788889999"],
+    "comment_count": 2,
+    "created_at": "2026-04-15T20:00:00.000+00:00",
+    "updated_at": "2026-04-16T09:00:00.000+00:00"
+  },
+  {
+    "_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0001",
+    "id": "b2222222-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "caption": "New pickup: Jordan 4 Military Black. Thoughts?",
+    "hashtags": ["#sneakers", "#jordan4", "#kicks"],
+    "garment_tags": [
+      {"type": "sneakers", "color": "black/grey", "style": "athletic"},
+      {"type": "joggers", "color": "black", "style": "sporty"},
+      {"type": "t-shirt", "color": "white", "style": "minimal"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/jordan4/600/800", "https://picsum.photos/seed/sneaker2/600/800"],
+    "like_user_ids": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "c3d4e5f6-3333-4444-5555-666677778888", "e5f6a7b8-5555-6666-7777-888899990000"],
+    "comment_count": 4,
+    "created_at": "2026-04-30T11:00:00.000+00:00",
+    "updated_at": "2026-05-01T15:30:00.000+00:00"
+  },
+  {
+    "_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0002",
+    "id": "b2222222-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "caption": "Minimal summer fit: lin blanc + espadrilles.",
+    "hashtags": ["#summer", "#minimal", "#linen"],
+    "garment_tags": [
+      {"type": "shirt", "color": "white", "style": "minimal"},
+      {"type": "pants", "color": "beige", "style": "linen"},
+      {"type": "espadrilles", "color": "navy", "style": "summer"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/linen1/600/800"],
+    "like_user_ids": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "b2c3d4e5-2222-3333-4444-555566667777"],
+    "comment_count": 1,
+    "created_at": "2026-04-25T16:45:00.000+00:00",
+    "updated_at": "2026-04-25T16:45:00.000+00:00"
+  },
+  {
+    "_id": "b2222222-aaaa-bbbb-cccc-ddddeeee0003",
+    "id": "b2222222-aaaa-bbbb-cccc-ddddeeee0003",
+    "author_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "caption": "Layering game: bomber jacket + hoodie underneath.",
+    "hashtags": ["#layering", "#streetwear", "#fall"],
+    "garment_tags": [
+      {"type": "bomber jacket", "color": "olive", "style": "streetwear"},
+      {"type": "hoodie", "color": "grey", "style": "casual"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/bomber1/600/800"],
+    "like_user_ids": ["c3d4e5f6-3333-4444-5555-666677778888"],
+    "comment_count": 0,
+    "created_at": "2026-04-18T13:00:00.000+00:00",
+    "updated_at": "2026-04-18T13:00:00.000+00:00"
+  },
+  {
+    "_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "id": "c3333333-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "caption": "Hijab styling: camel coat + white sneakers pour le bureau.",
+    "hashtags": ["#hijabfashion", "#modest", "#workwear"],
+    "garment_tags": [
+      {"type": "coat", "color": "camel", "style": "modest"},
+      {"type": "hijab", "color": "cream", "style": "elegant"},
+      {"type": "sneakers", "color": "white", "style": "clean"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/hijab1/600/800"],
+    "like_user_ids": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "a1b2c3d4-1111-2222-3333-444455556666", "d4e5f6a7-4444-5555-6666-777788889999", "e5f6a7b8-5555-6666-7777-888899990000", "c3d4e5f6-3333-4444-5555-666677778888"],
+    "comment_count": 5,
+    "created_at": "2026-05-01T09:00:00.000+00:00",
+    "updated_at": "2026-05-02T12:00:00.000+00:00"
+  },
+  {
+    "_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0002",
+    "id": "c3333333-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "caption": "Abaya moderne avec ceinture pour un iftar. Love this look.",
+    "hashtags": ["#abaya", "#ramadan", "#modestfashion"],
+    "garment_tags": [
+      {"type": "abaya", "color": "navy", "style": "modern"},
+      {"type": "belt", "color": "gold", "style": "accessory"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/abaya1/600/800"],
+    "like_user_ids": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "d4e5f6a7-4444-5555-6666-777788889999"],
+    "comment_count": 2,
+    "created_at": "2026-04-22T19:30:00.000+00:00",
+    "updated_at": "2026-04-23T08:00:00.000+00:00"
+  },
+  {
+    "_id": "c3333333-aaaa-bbbb-cccc-ddddeeee0003",
+    "id": "c3333333-aaaa-bbbb-cccc-ddddeeee0003",
+    "author_id": "b2c3d4e5-2222-3333-4444-555566667777",
+    "caption": "Beach day outfit: maxi dress + sandales dorées.",
+    "hashtags": ["#beach", "#summer", "#maxidress"],
+    "garment_tags": [
+      {"type": "maxi dress", "color": "turquoise", "style": "beach"},
+      {"type": "sandals", "color": "gold", "style": "summer"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/beach1/600/800"],
+    "like_user_ids": ["a1b2c3d4-1111-2222-3333-444455556666"],
+    "comment_count": 1,
+    "created_at": "2026-04-12T15:00:00.000+00:00",
+    "updated_at": "2026-04-12T15:00:00.000+00:00"
+  },
+  {
+    "_id": "d4444444-aaaa-bbbb-cccc-ddddeeee0001",
+    "id": "d4444444-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "caption": "Trouvaille vintage: veste en cuir 80s du souk de Rabat.",
+    "hashtags": ["#vintage", "#thrift", "#leather"],
+    "garment_tags": [
+      {"type": "leather jacket", "color": "brown", "style": "vintage"},
+      {"type": "t-shirt", "color": "black", "style": "basic"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/vintage1/600/800", "https://picsum.photos/seed/leather1/600/800"],
+    "like_user_ids": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "a1b2c3d4-1111-2222-3333-444455556666", "b2c3d4e5-2222-3333-4444-555566667777"],
+    "comment_count": 3,
+    "created_at": "2026-04-29T10:15:00.000+00:00",
+    "updated_at": "2026-04-30T14:00:00.000+00:00"
+  },
+  {
+    "_id": "d4444444-aaaa-bbbb-cccc-ddddeeee0002",
+    "id": "d4444444-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "c3d4e5f6-3333-4444-5555-666677778888",
+    "caption": "Full vintage look: chemise à fleurs + pantalon large. 70s vibes.",
+    "hashtags": ["#70s", "#vintage", "#retro"],
+    "garment_tags": [
+      {"type": "shirt", "color": "floral", "style": "70s"},
+      {"type": "wide pants", "color": "brown", "style": "retro"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/retro1/600/800"],
+    "like_user_ids": ["b2c3d4e5-2222-3333-4444-555566667777", "e5f6a7b8-5555-6666-7777-888899990000"],
+    "comment_count": 1,
+    "created_at": "2026-04-20T17:00:00.000+00:00",
+    "updated_at": "2026-04-20T17:00:00.000+00:00"
+  },
+  {
+    "_id": "e5555555-aaaa-bbbb-cccc-ddddeeee0001",
+    "id": "e5555555-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "caption": "OOTD depuis Marrakech: robe fluide + chapeau de paille.",
+    "hashtags": ["#ootd", "#marrakech", "#boheme"],
+    "garment_tags": [
+      {"type": "dress", "color": "terracotta", "style": "bohemian"},
+      {"type": "hat", "color": "straw", "style": "summer"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/marrakech1/600/800"],
+    "like_user_ids": ["f76c1f42-57eb-46bc-aa9b-e6248db00c6f", "b2c3d4e5-2222-3333-4444-555566667777", "a1b2c3d4-1111-2222-3333-444455556666"],
+    "comment_count": 2,
+    "created_at": "2026-05-02T08:00:00.000+00:00",
+    "updated_at": "2026-05-02T14:00:00.000+00:00"
+  },
+  {
+    "_id": "e5555555-aaaa-bbbb-cccc-ddddeeee0002",
+    "id": "e5555555-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "d4e5f6a7-4444-5555-6666-777788889999",
+    "caption": "Sport chic: legging + crop top pour le yoga.",
+    "hashtags": ["#sportchic", "#yoga", "#fitness"],
+    "garment_tags": [
+      {"type": "legging", "color": "black", "style": "sport"},
+      {"type": "crop top", "color": "pink", "style": "fitness"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/yoga1/600/800"],
+    "like_user_ids": ["e5f6a7b8-5555-6666-7777-888899990000"],
+    "comment_count": 0,
+    "created_at": "2026-04-26T07:30:00.000+00:00",
+    "updated_at": "2026-04-26T07:30:00.000+00:00"
+  },
+  {
+    "_id": "f6666666-aaaa-bbbb-cccc-ddddeeee0001",
+    "id": "f6666666-aaaa-bbbb-cccc-ddddeeee0001",
+    "author_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "caption": "Gym to street: polo fitted + chino slim. Clean transition.",
+    "hashtags": ["#gymtostreet", "#smartcasual", "#fitted"],
+    "garment_tags": [
+      {"type": "polo", "color": "navy", "style": "smart casual"},
+      {"type": "chinos", "color": "beige", "style": "slim"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/polo1/600/800"],
+    "like_user_ids": ["a1b2c3d4-1111-2222-3333-444455556666", "c3d4e5f6-3333-4444-5555-666677778888", "b2c3d4e5-2222-3333-4444-555566667777"],
+    "comment_count": 2,
+    "created_at": "2026-04-27T18:00:00.000+00:00",
+    "updated_at": "2026-04-28T09:00:00.000+00:00"
+  },
+  {
+    "_id": "f6666666-aaaa-bbbb-cccc-ddddeeee0002",
+    "id": "f6666666-aaaa-bbbb-cccc-ddddeeee0002",
+    "author_id": "e5f6a7b8-5555-6666-7777-888899990000",
+    "caption": "Weekend mode: survetement + casquette. Tanger relax.",
+    "hashtags": ["#weekend", "#casual", "#tracksuit"],
+    "garment_tags": [
+      {"type": "tracksuit", "color": "grey", "style": "casual"},
+      {"type": "cap", "color": "black", "style": "sporty"}
+    ],
+    "image_urls": ["https://picsum.photos/seed/tracksuit1/600/800"],
+    "like_user_ids": ["a1b2c3d4-1111-2222-3333-444455556666"],
+    "comment_count": 0,
+    "created_at": "2026-04-19T11:00:00.000+00:00",
+    "updated_at": "2026-04-19T11:00:00.000+00:00"
+  }
+]

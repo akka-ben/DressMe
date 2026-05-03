@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
     api_base_url: str = Field(default="http://localhost:8000", alias="API_BASE_URL")
     frontend_url: str = Field(default="http://localhost:8081", alias="FRONTEND_URL")
+    upload_dir: str = Field(default="uploads", alias="UPLOAD_DIR")
+    media_upload_max_mb: int = Field(default=50, alias="MEDIA_UPLOAD_MAX_MB")
 
     email_verification_token_expire_hours: int = Field(
         default=24,

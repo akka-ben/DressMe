@@ -13,6 +13,12 @@ services:
     volumes:
       - mongo_data:/data/db
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -35,6 +41,7 @@ services:
     depends_on:
       - mongo
       - redis
+      - mailpit
       - minio
 
 volumes:

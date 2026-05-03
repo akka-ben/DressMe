@@ -1,0 +1,168 @@
+PostDetailScreen - Implementation reelle - 2026-05-03
+=====================================================
+
+Objectif
+--------
+Remplacer l'ancien PostDetailScreen mock par un vrai ecran detail de publication,
+avec un comportement proche d'Instagram:
+
+- ouvrir un post depuis le feed
+- voir l'image/video, auteur, caption, hashtags, tags vetements
+- liker/unliker
+- sauvegarder/desauvegarder
+- afficher les commentaires reels
+- ajouter un commentaire
+- synchroniser le tout avec FastAPI + MongoDB
+
+
+Fichiers modifies
+-----------------
+1. mobile/src/screens/PostDetailScreen.tsx
+   - Refonte complete de l'ecran.
+   - Chargement reel du post avec client.getPost.
+   - Chargement reel des commentaires avec client.getPostComments.
+   - Ajout commentaire avec client.addPostComment.
+   - Like avec client.togglePostLike.
+   - Sauvegarde avec client.togglePostSave.
+   - UI type Instagram:
+     header retour
+     media principal
+     actions like/comment/share/save
+     caption
+     hashtags
+     tags vetements
+     liste commentaires
+     input commentaire sticky en bas
+
+2. mobile/App.tsx
+   - Ajout d'un etat selectedPostId.
+   - Si selectedPostId existe, l'app affiche PostDetailScreen.
+   - Retour detail -> remet selectedPostId a null.
+   - Changement de tab -> ferme le detail.
+
+3. mobile/src/screens/HomeFeedScreen.tsx
+   - Ajout de la prop onOpenPost.
+   - Image, description et icone commentaire ouvrent PostDetailScreen.
+   - Le bouton save est maintenant connecte au backend.
+   - Le feed lit savedByMe depuis l'API.
+
+4. mobile/src/services/api/apiClient.ts
+   - Ajout getPost.
+   - Ajout addPostComment.
+   - Ajout togglePostSave.
+   - Ajout getSavedPosts.
+   - Mapping Post ajoute:
+     mediaType
+     savedByMe
+
+5. mobile/src/services/types.ts
+   - Interface DressMeClient etendue.
+
+6. mobile/src/types/contracts.ts
+   - Type Post ajoute:
+     mediaType: "image" | "video"
+     savedByMe: boolean
+
+7. backend/app/schemas/contracts.py
+   - Ajout AddCommentInput.
+   - PostDTO ajoute:
+     media_type
+     saved_by_me
+
+8. backend/app/modules/social/service.py
+   - Ajout commentaire reel MongoDB.
+   - Ajout sauvegarde post/video MongoDB.
+   - Ajout detection media image/video.
+   - Ajout lecture des posts sauvegardes.
+
+9. backend/app/modules/social/router.py
+   - Ajout/connexion endpoints:
+     GET  /api/v1/posts/{post_id}
+     GET  /api/v1/posts/{post_id}/comments
+     POST /api/v1/posts/{post_id}/comments
+     POST /api/v1/posts/{post_id}/like
+     POST /api/v1/posts/{post_id}/save
+     GET  /api/v1/users/me/saved-posts
+
+10. backend/app/db/session.py
+    - Ajout indexes MongoDB:
+      comments_post_created_at
+      saved_posts_user_created_at
+      saved_posts_user_post_unique
+
+
+Collections MongoDB utilisees
+-----------------------------
+1. posts
+   - stocke les publications.
+   - champs importants:
+     _id
+     author_id
+     caption
+     image_urls / video_url / media
+     media_type
+     hashtags
+     garment_tags
+     like_user_ids
+     comment_count
+     created_at
+
+2. comments
+   - stocke les commentaires reels.
+   - champs:
+     _id
+     post_id
+     author_id
+     content
+     created_at
+
+3. saved_posts
+   - stocke les posts/videos enregistres par utilisateur.
+   - champs:
+     _id = user_id:post_id
+     user_id
+     post_id
+     media_type
+     created_at
+
+
+Fonctionnement sauvegarde video
+-------------------------------
+Quand un post a:
+
+media_type: "video"
+
+ou un champ video_url / videos / media type video,
+le backend detecte le post comme video.
+
+Si l'utilisateur touche bookmark dans PostDetailScreen:
+
+POST /api/v1/posts/{post_id}/save
+
+Le document est ajoute dans saved_posts avec:
+
+media_type: "video"
+
+Ensuite il apparait dans le profil via:
+
+GET /api/v1/users/me/saved-posts?media_type=video
+
+
+Tests effectues
+---------------
+- backend import OK
+- npm run typecheck OK
+- Login API OK
+- GET /posts/{post_id} OK
+- POST /posts/{post_id}/comments OK
+- GET /posts/{post_id}/comments OK
+- POST /posts/{post_id}/save OK
+- GET /users/me/saved-posts OK
+- GET /users/me/saved-posts?media_type=video OK
+
+
+Limites restantes
+-----------------
+- La lecture video native n'est pas encore implementee avec expo-video.
+- Pour l'instant, un post video est affiche avec un overlay "Video / Reel".
+- La vraie lecture video sera a traiter dans ReelsScreen.

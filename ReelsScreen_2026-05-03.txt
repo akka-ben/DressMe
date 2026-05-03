@@ -1,0 +1,58 @@
+ReelsScreen - modifications du 2026-05-03
+
+Objectif:
+- Remplacer l'onglet central Publier par un onglet Reels.
+- Deplacer l'acces creation de post vers le haut du Feed.
+- Ajouter un ecran Reels connecte aux donnees MongoDB.
+
+Fichiers modifies:
+- mobile/src/components/TabBar.tsx
+- mobile/App.tsx
+- mobile/src/screens/HomeFeedScreen.tsx
+- mobile/src/screens/CreatePostScreen.tsx
+- mobile/src/screens/ReelsScreen.tsx
+- mobile/src/services/types.ts
+- mobile/src/services/api/apiClient.ts
+- mobile/src/services/mock/mockClient.ts
+- backend/app/schemas/contracts.py
+- backend/app/modules/social/router.py
+- backend/app/modules/social/service.py
+
+Navigation:
+- AppTab change de create vers reels.
+- La TabBar affiche maintenant: Feed, Recherche, Reels, Messages, Profil.
+- L'onglet Reels ouvre ReelsScreen.
+- La creation de post est accessible depuis le bouton + dans le header du Feed.
+- CreatePostScreen peut etre ferme avec X.
+- Apres creation d'un Post, retour automatique vers le Feed.
+- Apres creation d'un Reel, retour automatique vers Reels.
+
+CreatePostScreen:
+- Ajout d'un toggle Post / Reel dans l'ecran de creation.
+- Si Post est actif, la publication est creee avec media_type image.
+- Si Reel est actif, la publication est creee avec media_type video.
+- Le payload envoye au backend inclut maintenant media_type.
+
+Backend:
+- CreatePostInput accepte media_type: image ou video.
+- create_post stocke media_type dans MongoDB.
+- Ajout de GET /api/v1/reels avec pagination limit/offset.
+- list_reels_posts lit les documents MongoDB de type video/reel.
+- L'endpoint supporte les donnees normalisees avec media_type video et certains imports avec video_url/video_urls/videos.
+
+ReelsScreen:
+- Charge les reels via client.getReels.
+- Utilise FlatList verticale avec pagingEnabled.
+- Affiche chaque reel en plein format mobile avec overlay sombre.
+- Actions disponibles:
+  - Like via POST /posts/{post_id}/like.
+  - Commentaires: ouvre PostDetailScreen.
+  - Partage via Share.share + POST /posts/{post_id}/share.
+  - Enregistrement via POST /posts/{post_id}/save.
+- Les videos enregistrees restent visibles dans l'onglet Videos du ProfileScreen.
+- Si aucun reel n'existe, affiche un etat vide demandant de creer/importer un post media_type video.
+
+Verification:
+- npm run typecheck: OK.
+- Imports backend: OK.
+- GET /api/v1/reels?limit=2 teste: endpoint OK, aucun reel trouve actuellement dans MongoDB si aucun document media_type video n'existe.

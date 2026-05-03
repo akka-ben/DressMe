@@ -1,0 +1,63 @@
+ProfileScreen - Section sauvegardes/videos - 2026-05-03
+=======================================================
+
+Objectif
+--------
+Faire apparaitre les publications sauvegardees dans le profil, et ajouter une
+section dediee aux videos enregistrees.
+
+
+Fichiers modifies
+-----------------
+1. mobile/src/screens/ProfileScreen.tsx
+   - Ajout de useAuth pour recuperer token/user.
+   - Ajout du chargement des sauvegardes depuis l'API.
+   - Ajout de l'onglet "Enregistres".
+   - Ajout de l'onglet "Videos".
+   - Les posts sauvegardes sont cliquables et ouvrent PostDetailScreen.
+
+2. mobile/App.tsx
+   - ProfileScreen recoit maintenant onOpenPost.
+
+3. mobile/src/services/api/apiClient.ts
+   - Ajout getSavedPosts.
+
+4. backend/app/modules/social/router.py
+   - Ajout:
+     GET /api/v1/users/me/saved-posts
+
+
+Fonctionnement
+--------------
+Onglet Enregistres:
+
+GET /api/v1/users/me/saved-posts
+
+Onglet Videos:
+
+GET /api/v1/users/me/saved-posts?media_type=video
+
+Si l'utilisateur sauvegarde une video depuis PostDetailScreen, elle est stockee
+dans MongoDB collection saved_posts avec:
+
+media_type: "video"
+
+Puis elle apparait dans l'onglet Videos du profil.
+
+
+Etat vide
+---------
+Si aucune video n'est enregistree, l'ecran affiche:
+
+Aucune video enregistree
+
+Si aucun post n'est enregistre, l'ecran affiche:
+
+Aucun post enregistre
+
+
+Tests effectues
+---------------
+- npm run typecheck OK
+- GET /users/me/saved-posts OK
+- GET /users/me/saved-posts?media_type=video OK
