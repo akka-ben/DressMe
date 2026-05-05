@@ -12,6 +12,7 @@ import {
 import { Search, UserRound, X } from "lucide-react-native";
 
 import { client } from "../services";
+import { useAuth } from "../context/AuthContext";
 import type { Conversation, User } from "../types/contracts";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
 
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function NewChatScreen({ onBack, onConversationCreated }: Props) {
+  const { token } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export function NewChatScreen({ onBack, onConversationCreated }: Props) {
     try {
       setLoading(true);
       setError(null);
-      const data = await client.getChatUsers();
+      const data = await client.getChatUsers(token ?? undefined);
       setUsers(data);
     } catch (requestError) {
       const message =
@@ -40,7 +42,7 @@ export function NewChatScreen({ onBack, onConversationCreated }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     void loadUsers();
@@ -60,7 +62,7 @@ export function NewChatScreen({ onBack, onConversationCreated }: Props) {
   const startChat = async (userId: string) => {
     try {
       setCreatingUserId(userId);
-      const conversation = await client.startConversation(userId);
+      const conversation = await client.startConversation(userId, token ?? undefined);
       onConversationCreated(conversation);
     } catch (requestError) {
       const message =

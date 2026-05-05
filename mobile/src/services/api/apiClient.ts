@@ -4,6 +4,7 @@ import type {
   AIRecommendationItem,
   AuthMessage,
   AuthSession,
+  CallSession,
   Comment,
   Conversation,
   Message,
@@ -122,6 +123,13 @@ type BackendConversation = {
   unread_count?: number;
 };
 
+type BackendCallSession = {
+  id: string;
+  kind: "audio" | "video";
+  state: "ringing" | "connecting" | "in_call" | "ended";
+  peer: BackendUser;
+};
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -235,27 +243,29 @@ export class ApiDressMeClient implements DressMeClient {
     return mapProfile(profile);
   }
 
-  async getChatUsers(): Promise<User[]> {
-    const users = await this.request<BackendUser[]>("/chat/users");
+  async getChatUsers(token?: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>("/chat/users", undefined, token);
     return users.map(mapUser);
   }
 
-  async getConversations(): Promise<Conversation[]> {
-    const conversations = await this.request<BackendConversation[]>("/chat/conversations");
+  async getConversations(token?: string): Promise<Conversation[]> {
+    const conversations = await this.request<BackendConversation[]>("/chat/conversations", undefined, token);
     return conversations.map(mapConversation);
   }
 
-  async startConversation(userId: string): Promise<Conversation> {
+  async startConversation(userId: string, token?: string): Promise<Conversation> {
     const conversation = await this.request<BackendConversation>("/chat/conversations", {
       method: "POST",
       body: JSON.stringify({ user_id: userId }),
-    });
+    }, token);
     return mapConversation(conversation);
   }
 
-  async getConversationMessages(conversationId: string): Promise<Message[]> {
+  async getConversationMessages(conversationId: string, token?: string): Promise<Message[]> {
     const messages = await this.request<BackendChatMessage[]>(
       `/chat/conversations/${conversationId}/messages`,
+      undefined,
+      token,
     );
     return messages.map(mapChatMessage);
   }
@@ -263,6 +273,7 @@ export class ApiDressMeClient implements DressMeClient {
   async sendConversationMessage(
     conversationId: string,
     input: { body: string; kind?: "text" | "image" | "audio" },
+    token?: string,
   ): Promise<Message> {
     const message = await this.request<BackendChatMessage>(
       `/chat/conversations/${conversationId}/messages`,
@@ -273,8 +284,40 @@ export class ApiDressMeClient implements DressMeClient {
           kind: input.kind ?? "text",
         }),
       },
+      token,
     );
     return mapChatMessage(message);
+  }
+
+  async startCall(peerId: string, kind: "audio" | "video", token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>("/calls/start", {
+      method: "POST",
+      body: JSON.stringify({ peer_id: peerId, kind }),
+    }, token);
+    return mapCallSession(session);
+  }
+
+  async getIncomingCalls(token?: string): Promise<CallSession[]> {
+    const sessions = await this.request<BackendCallSession[]>("/calls/incoming", undefined, token);
+    return sessions.map(mapCallSession);
+  }
+
+  async answerCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/answer`,
+      { method: "POST" },
+      token,
+    );
+    return mapCallSession(session);
+  }
+
+  async rejectCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/reject`,
+      { method: "POST" },
+      token,
+    );
+    return mapCallSession(session);
   }
 
   async helpMeChoose(input: {
@@ -410,5 +453,14 @@ function mapConversation(conversation: BackendConversation): Conversation {
     participants: conversation.participants.map(mapUser),
     lastMessage: conversation.last_message ? mapChatMessage(conversation.last_message) : undefined,
     unreadCount: conversation.unread_count ?? 0,
+  };
+}
+
+function mapCallSession(session: BackendCallSession): CallSession {
+  return {
+    id: session.id,
+    kind: session.kind,
+    state: session.state,
+    peer: mapUser(session.peer),
   };
 }

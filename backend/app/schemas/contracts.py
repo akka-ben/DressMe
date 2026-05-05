@@ -126,3 +126,8 @@ class CallSessionDTO(BaseModel):
     kind: Literal["audio", "video"]
     state: Literal["ringing", "connecting", "in_call", "ended"]
     peer: UserDTO
+
+
+class StartCallInput(BaseModel):
+    peer_id: str = Field(..., min_length=1, max_length=100)
+    kind: Literal["audio", "video"] = "audio"

@@ -23,7 +23,7 @@ type Props = {
 };
 
 export function ChatListScreen({ onOpenConversation, onCreateConversation }: Props) {
-  const { user } = useAuth();
+  const { token, user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -37,7 +37,7 @@ export function ChatListScreen({ onOpenConversation, onCreateConversation }: Pro
         setLoading(true);
       }
       setError(null);
-      const data = await client.getConversations();
+      const data = await client.getConversations(token ?? undefined);
       setConversations(data);
     } catch (requestError) {
       const message =
@@ -51,7 +51,7 @@ export function ChatListScreen({ onOpenConversation, onCreateConversation }: Pro
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     void loadConversations();

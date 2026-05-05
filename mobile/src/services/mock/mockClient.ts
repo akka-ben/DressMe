@@ -7,7 +7,7 @@ import {
   mockRecommendations,
 } from "./mockData";
 import type { DressMeClient } from "../types";
-import type { AuthMessage, AuthSession, User } from "../../types/contracts";
+import type { AuthMessage, AuthSession, CallSession, User } from "../../types/contracts";
 
 
 const delay = async (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -72,6 +72,7 @@ export class MockDressMeClient implements DressMeClient {
   async sendConversationMessage(
     conversationId: string,
     input: { body: string; kind?: "text" | "image" | "audio" },
+    _token?: string,
   ) {
     await delay();
     return {
@@ -82,6 +83,22 @@ export class MockDressMeClient implements DressMeClient {
       body: input.body,
       createdAt: new Date().toISOString(),
     };
+  }
+
+  async startCall(): Promise<CallSession> {
+    throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
+  }
+
+  async getIncomingCalls() {
+    return [];
+  }
+
+  async answerCall(): Promise<CallSession> {
+    throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
+  }
+
+  async rejectCall(): Promise<CallSession> {
+    throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
   }
 
   async helpMeChoose() {

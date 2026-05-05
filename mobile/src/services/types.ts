@@ -2,6 +2,7 @@ import type {
   AIRecommendation,
   AuthMessage,
   AuthSession,
+  CallSession,
   Comment,
   Conversation,
   Message,
@@ -24,14 +25,19 @@ export interface DressMeClient {
   getFeed(): Promise<Post[]>;
   getPostComments(postId: string): Promise<Comment[]>;
   getProfile(userId: string): Promise<Profile>;
-  getChatUsers(): Promise<User[]>;
-  getConversations(): Promise<Conversation[]>;
-  startConversation(userId: string): Promise<Conversation>;
-  getConversationMessages(conversationId: string): Promise<Message[]>;
+  getChatUsers(token?: string): Promise<User[]>;
+  getConversations(token?: string): Promise<Conversation[]>;
+  startConversation(userId: string, token?: string): Promise<Conversation>;
+  getConversationMessages(conversationId: string, token?: string): Promise<Message[]>;
   sendConversationMessage(
     conversationId: string,
     input: { body: string; kind?: "text" | "image" | "audio" },
+    token?: string,
   ): Promise<Message>;
+  startCall(peerId: string, kind: "audio" | "video", token?: string): Promise<CallSession>;
+  getIncomingCalls(token?: string): Promise<CallSession[]>;
+  answerCall(callId: string, token?: string): Promise<CallSession>;
+  rejectCall(callId: string, token?: string): Promise<CallSession>;
   helpMeChoose(input: {
     imageUrl: string;
     occasion?: string;

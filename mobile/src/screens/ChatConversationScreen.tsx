@@ -38,7 +38,7 @@ type Props = {
 const REALTIME_REFRESH_MS = 3000;
 
 export function ChatConversationScreen({ conversation, onBack, onStartCall }: Props) {
-  const { user } = useAuth();
+  const { token, user } = useAuth();
   const scrollRef = useRef<ScrollView | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -61,7 +61,7 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
       if (showLoader) {
         setLoading(true);
       }
-      const data = await client.getConversationMessages(conversation.id);
+      const data = await client.getConversationMessages(conversation.id, token ?? undefined);
       setMessages(data);
       setError(null);
     } catch (requestError) {
@@ -71,7 +71,7 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
     } finally {
       setLoading(false);
     }
-  }, [conversation.id]);
+  }, [conversation.id, token]);
 
   useEffect(() => {
     void loadMessages(true);
@@ -116,7 +116,11 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
     setSending(true);
 
     try {
-      const saved = await client.sendConversationMessage(conversation.id, { body, kind });
+      const saved = await client.sendConversationMessage(
+        conversation.id,
+        { body, kind },
+        token ?? undefined,
+      );
       setMessages((current) =>
         current.map((message) => (message.id === optimisticMessage.id ? saved : message)),
       );
