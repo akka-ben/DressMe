@@ -21,11 +21,15 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<AuthMessage>;
   logout: () => Promise<void>;
+  updateUser: (user: User) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const updateUser = useCallback((updatedUser: User) => {
+  setUser(updatedUser);
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       register,
       logout,
+      updateUser,
     }),
     [isLoading, login, logout, register, token, user],
   );

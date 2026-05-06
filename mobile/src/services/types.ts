@@ -59,4 +59,16 @@ export interface DressMeClient {
     occasion?: string;
     userPrompt?: string;
   }): Promise<AIRecommendation[]>;
+  getMyPosts(token: string): Promise<Post[]>;
+  updateProfile(
+    userId: string,
+    data: { firstName?: string; lastName?: string; bio?: string; avatarUrl?: string },
+    token: string
+  ): Promise<Profile>;
+  followUser(userId: string, token: string): Promise<{ following: boolean }>;
+  unfollowUser(userId: string, token: string): Promise<{ following: boolean }>;
+  
+  getUserPosts(userId: string, token?: string): Promise<Post[]>;
+  getFollowing(userId: string, token?: string): Promise<User[]>;
+  getUserFollowers(userId: string, token?: string): Promise<User[]>;
 }

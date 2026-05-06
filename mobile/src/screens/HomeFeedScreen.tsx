@@ -99,9 +99,10 @@ type FeedStory = {
 type HomeFeedScreenProps = {
   onOpenPost?: (postId: string) => void;
   onOpenCreate?: () => void;
+  onOpenProfile?: (userId: string) => void;
 };
 
-export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps) {
+export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenProfile }: HomeFeedScreenProps) {
   const { token, user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [stories, setStories] = useState<FeedStory[]>(() => initialStories.map(mapFashionStory));
@@ -365,6 +366,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
       <PostCard
         post={item}
         onOpen={() => onOpenPost?.(item.sourcePostId)}
+        onOpenProfile={() => onOpenProfile?.(item.author.id)}
         onHelp={() => setShowStylist(true)}
         onLike={() => toggleLike(item.feedId)}
         onSave={() => toggleSave(item.feedId)}
@@ -373,7 +375,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
         onVote={(optionId) => votePoll(item.feedId, optionId)}
       />
     ),
-    [onOpenPost, sharePost, toggleLike, toggleSave, votePoll],
+    [onOpenPost, onOpenProfile, sharePost, toggleLike, toggleSave, votePoll],
   );
 
   return (
@@ -667,6 +669,7 @@ function formatRelativeDate(value: string): string {
 const PostCard = memo(function PostCard({
   post,
   onOpen,
+  onOpenProfile,
   onHelp,
   onLike,
   onSave,
@@ -676,6 +679,7 @@ const PostCard = memo(function PostCard({
 }: {
   post: FeedPost;
   onOpen: () => void;
+  onOpenProfile: () => void;
   onHelp: () => void;
   onLike: () => void;
   onSave: () => void;
@@ -683,6 +687,7 @@ const PostCard = memo(function PostCard({
   onOpenMenu: () => void;
   onVote: (optionId: string) => void;
 }) {
+
   const user = post.author;
   const totalVotes = post.pollOptions?.reduce((sum, option) => sum + option.votes, 0) ?? 0;
 

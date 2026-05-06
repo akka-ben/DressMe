@@ -108,4 +108,33 @@ export class MockDressMeClient implements DressMeClient {
     await delay(600);
     return mockRecommendations;
   }
+  async getMyPosts(): Promise<Post[]> {
+    await delay();
+    return mockPosts;
+  }
+
+  async updateProfile(): Promise<import("../../types/contracts").Profile> {
+    throw new Error("Mock updateProfile is disabled. Use ApiDressMeClient.");
+  }
+
+  async followUser(): Promise<{ following: boolean }> {
+    throw new Error("Mock followUser is disabled. Use ApiDressMeClient.");
+  }
+
+  async unfollowUser(): Promise<{ following: boolean }> {
+    throw new Error("Mock unfollowUser is disabled. Use ApiDressMeClient.");
+  }
+  async getUserPosts(): Promise<Post[]> {
+  await delay();
+  return mockPosts;
+}
+async getUserFollowers(): Promise<User[]> {
+  await delay();
+  return [];
+}
+
+async getFollowing(): Promise<User[]> {
+  await delay();
+  return [];
+}
 }

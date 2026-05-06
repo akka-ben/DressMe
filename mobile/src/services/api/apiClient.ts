@@ -260,6 +260,74 @@ export class ApiDressMeClient implements DressMeClient {
     const user = await this.request<BackendUser>("/auth/me", undefined, token);
     return mapUser(user);
   }
+  async getMyPosts(token: string): Promise<Post[]> {
+  const posts = await this.request<BackendPost[]>("/users/me/posts", undefined, token);
+  return posts.map(mapPost);
+}
+
+async updateProfile(
+  userId: string,
+  data: { firstName?: string; lastName?: string; bio?: string; avatarUrl?: string },
+  token: string
+): Promise<Profile> {
+  const profile = await this.request<BackendProfile>(
+    `/users/${userId}/profile`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        first_name: data.firstName,
+        last_name: data.lastName,
+        bio: data.bio,
+        avatar_url: data.avatarUrl,
+      }),
+    },
+    token
+  );
+  return mapProfile(profile);
+}
+
+async followUser(userId: string, token: string): Promise<{ following: boolean }> {
+  return this.request<{ following: boolean }>(
+    `/users/${userId}/follow`,
+    { method: "POST" },
+    token
+  );
+}
+
+async unfollowUser(userId: string, token: string): Promise<{ following: boolean }> {
+  return this.request<{ following: boolean }>(
+    `/users/${userId}/unfollow`,
+    { method: "POST" },
+    token
+  );
+}
+
+async getUserPosts(userId: string, token?: string): Promise<Post[]> {
+  const posts = await this.request<BackendPost[]>(
+    `/users/${userId}/posts`,
+    undefined,
+    token
+  );
+  return posts.map(mapPost);
+}
+
+async getUserFollowers(userId: string, token?: string): Promise<User[]> {
+  const users = await this.request<BackendUser[]>(
+    `/users/${userId}/followers`,
+    undefined,
+    token
+  );
+  return users.map(mapUser);
+}
+
+async getFollowing(userId: string, token?: string): Promise<User[]> {
+  const users = await this.request<BackendUser[]>(
+    `/users/${userId}/following`,
+    undefined,
+    token
+  );
+  return users.map(mapUser);
+}
 
   async getFeed(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]> {
     const params = new URLSearchParams();

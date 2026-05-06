@@ -27,6 +27,9 @@ import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { MessagesScreen } from "./src/screens/MessagesScreen";
 import { colors, fonts } from "./src/theme/dressme";
+import { EditProfileScreen } from "./src/screens/EditProfileScreen";
+import { UserProfileScreen } from "./src/screens/UserProfileScreen";
+import { FollowersScreen } from "./src/screens/FollowersScreen";
 
 const splashGif = require("./assets/dressme-splash.gif");
 const AUTHENTICATED_TOP_SPACE = Platform.OS === "ios" ? 58 : StatusBar.currentHeight ?? 0;
@@ -50,6 +53,12 @@ function AppShell() {
   const [showSplash, setShowSplash] = useState(true);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [followersState, setFollowersState] = useState<{
+    userId: string;
+    mode: "followers" | "following";
+  } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 3500);
@@ -59,17 +68,13 @@ function AppShell() {
   useEffect(() => {
     const handleUrl = (url: string | null) => {
       const token = extractResetToken(url);
-      if (!token) {
-        return;
-      }
-
+      if (!token) return;
       setResetToken(token);
       setAuthRoute("reset");
     };
 
     void Linking.getInitialURL().then(handleUrl);
     const subscription = Linking.addEventListener("url", ({ url }) => handleUrl(url));
-
     return () => subscription.remove();
   }, []);
 
@@ -133,29 +138,70 @@ function AppShell() {
 
     switch (activeTab) {
       case "feed":
+        if (viewingUserId) {
+          return (
+            <UserProfileScreen
+              userId={viewingUserId}
+              onBack={() => setViewingUserId(null)}
+              onOpenPost={setSelectedPostId}
+            />
+          );
+        }
         return (
           <HomeFeedScreen
             onOpenPost={setSelectedPostId}
-            onOpenCreate={() => {
-              setSelectedPostId(null);
-              setShowCreatePost(true);
-            }}
+            onOpenProfile={(userId: string) => setViewingUserId(userId)}
           />
         );
+
       case "search":
         return <SearchScreen />;
+
       case "reels":
         return <ReelsScreen onOpenPost={setSelectedPostId} />;
+
       case "messages":
         return <MessagesScreen />;
+
       case "profile":
-        return <ProfileScreen onOpenPost={setSelectedPostId} />;
+        if (followersState) {
+          return (
+            <FollowersScreen
+              userId={followersState.userId}
+              mode={followersState.mode}
+              onBack={() => setFollowersState(null)}
+              onOpenProfile={(uid) => {
+                setFollowersState(null);
+                setViewingUserId(uid);
+              }}
+            />
+          );
+        }
+        if (showEditProfile) {
+          return (
+            <EditProfileScreen
+              onBack={() => setShowEditProfile(false)}
+              onSaved={() => setShowEditProfile(false)}
+            />
+          );
+        }
+        return (
+          <ProfileScreen
+            onOpenPost={setSelectedPostId}
+            onEditProfile={() => setShowEditProfile(true)}
+            onOpenFollowers={(uid) => setFollowersState({ userId: uid, mode: "followers" })}
+            onOpenFollowing={(uid) => setFollowersState({ userId: uid, mode: "following" })}
+          />
+        );
     }
   };
 
   const changeTab = (tab: AppTab) => {
     setSelectedPostId(null);
     setShowCreatePost(false);
+    setShowEditProfile(false);
+    setViewingUserId(null);
+    setFollowersState(null);
     setActiveTab(tab);
   };
 
@@ -182,9 +228,7 @@ function AppShell() {
                   <ActivityIndicator color={colors.burgundy} />
                 </View>
               ) : isAuthenticated && authRoute !== "reset" ? (
-                <View style={styles.tabScreen}>
-                  {renderTab()}
-                </View>
+                <View style={styles.tabScreen}>{renderTab()}</View>
               ) : (
                 <ScrollView
                   style={styles.screen}
@@ -207,15 +251,9 @@ function AppShell() {
 }
 
 function extractResetToken(url: string | null): string | null {
-  if (!url || !url.includes("reset-password")) {
-    return null;
-  }
-
+  if (!url || !url.includes("reset-password")) return null;
   const match = url.match(/[?&]token=([^&#]+)/);
-  if (!match?.[1]) {
-    return null;
-  }
-
+  if (!match?.[1]) return null;
   return decodeURIComponent(match[1].replace(/\+/g, "%20"));
 }
 

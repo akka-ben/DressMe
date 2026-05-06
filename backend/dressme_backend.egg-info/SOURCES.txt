@@ -17,7 +17,9 @@ app/modules/auth/service.py
 app/modules/auth/sms_service.py
 app/modules/calls/router.py
 app/modules/chat/router.py
+app/modules/media/router.py
 app/modules/social/router.py
+app/modules/social/service.py
 app/modules/users/router.py
 app/schemas/auth.py
 app/schemas/contracts.py
