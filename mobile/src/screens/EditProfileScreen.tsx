@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { ArrowLeft, Camera, CheckCircle2 } from "lucide-react-native";
 
 import { useAuth } from "../context/AuthContext";
@@ -35,6 +36,39 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
     lastName  !== (user?.lastName ?? "")  ||
     bio       !== (user?.bio ?? "")       ||
     avatarUrl !== (user?.avatarUrl ?? "");
+
+const pickImage = async () => {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert("Permission refusée", "Autorisez l'accès à la galerie dans les paramètres.");
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.8,
+  });
+
+  if (result.canceled || !result.assets[0]) return;
+
+  if (!token) return;
+
+  const asset = result.assets[0];
+  const fileName = asset.uri.split("/").pop() ?? "avatar.jpg";
+  const fileType = asset.mimeType ?? "image/jpeg";
+
+  try {
+    const uploaded = await client.uploadMedia(
+      { uri: asset.uri, name: fileName, type: fileType },
+      token
+    );
+    setAvatarUrl(uploaded.url);
+  } catch (e) {
+    Alert.alert("Erreur", "Impossible d'uploader la photo.");
+  }
+};
 
   const handleSave = async () => {
     if (!token || !user?.id) return;
@@ -93,8 +127,8 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
             </Text>
           </View>
         )}
-        <Pressable style={styles.cameraBtn}>
-          <Camera size={16} color={colors.white} />
+        <Pressable style={styles.cameraBtn} onPress={() => void pickImage()}>
+            <Camera size={16} color={colors.white} />
         </Pressable>
       </View>
 
