@@ -44,6 +44,12 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>DressMe utilise votre camera pour capturer des tenues, reels et stories.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>DressMe utilise votre micro pour enregistrer le son des reels.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier.</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UILaunchStoryboardName</key>

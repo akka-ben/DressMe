@@ -1,0 +1,23 @@
+HomeFeedScreen - 2026-05-04 - Fix Maximum update depth StoryViewer
+
+Probleme:
+- Le viewer Story declenchait une boucle React "Maximum update depth exceeded".
+- Cause: onViewedStory etait declare inline dans le JSX.
+- A chaque render, cette fonction etait recréee.
+- Le useEffect du StoryViewer l'appelait, ce qui faisait setStories, donc rerender, donc nouvelle fonction, donc relance du useEffect.
+
+Corrections:
+- Ajout de markStoryAsViewed avec useCallback dans HomeFeedScreen.
+- markStoryAsViewed ne modifie le state que si la story n'est pas deja vue.
+- Le StoryViewer garde markedStoryIdsRef pour ne traiter chaque story active qu'une seule fois pendant l'ouverture du viewer.
+- Le useEffect du StoryViewer depend maintenant de l'id/sourceStoryId de la story active au lieu de l'objet story complet.
+
+Verification:
+- npm run typecheck: OK.
+- git diff --check: OK.
+
+Test:
+- Refresh Expo.
+- Ouvrir une story.
+- Passer story suivante/precedente.
+- L'erreur Maximum update depth ne doit plus apparaitre.

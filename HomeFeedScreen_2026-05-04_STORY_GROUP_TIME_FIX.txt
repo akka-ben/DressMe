@@ -1,0 +1,40 @@
+HomeFeedScreen - 2026-05-04 - Groupement stories et correction temps
+
+Problemes corriges:
+- Une story publiee depuis environ 1 minute pouvait apparaitre comme "1 h".
+- Plusieurs stories du meme utilisateur etaient affichees comme plusieurs toggles separes dans le feed.
+
+Correction temps:
+- Backend:
+  - normalize_datetime ajoute maintenant timezone UTC quand Mongo renvoie un datetime sans timezone.
+  - Cela evite que le mobile interprete une date UTC comme une date locale.
+- Mobile:
+  - formatRelativeDate parse maintenant les dates backend sans timezone comme UTC.
+  - Chaque story du viewer recalcule son propre timestamp au moment de l'affichage.
+
+Correction groupement:
+- Ajout d'un type local FeedStoryGroup.
+- Les stories sont groupees par utilisateur.
+- Dans le header du feed, un utilisateur apparait une seule fois meme s'il a plusieurs stories.
+- Pour "Votre Story", plusieurs stories personnelles deviennent un seul toggle.
+
+Viewer Story:
+- Le viewer recoit maintenant un groupe de stories au lieu d'une seule story.
+- Ajout navigation:
+  - Tap a droite: story suivante.
+  - Tap a gauche: story precedente.
+- Ajout de plusieurs barres de progression:
+  - Une barre par story du groupe.
+  - Les stories precedentes sont remplies.
+  - La story active progresse avec le timer.
+- Chaque story affiche son propre temps de publication.
+
+Verification:
+- npm run typecheck: OK.
+- Backend imports: OK.
+- git diff --check: OK.
+
+Important pour tester:
+- Redemarrer le backend pour appliquer la correction timezone.
+- Refresh Expo avec r.
+- Pull-to-refresh sur le Feed pour recharger les stories groupees.

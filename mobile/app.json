@@ -4,6 +4,7 @@
     "slug": "dressme",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./ios/DressMe/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -11,7 +12,8 @@
       "bundler": "metro"
     },
     "ios": {
-      "bundleIdentifier": "com.anonymous.dressme",
+      "bundleIdentifier": "com.mohammedbenakkaouayad.dressme",
+      "icon": "./ios/DressMe/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
       "infoPlist": {
         "NSCameraUsageDescription": "DressMe utilise votre camera pour capturer des tenues, reels et stories.",
         "NSMicrophoneUsageDescription": "DressMe utilise votre micro pour enregistrer le son des reels.",
@@ -32,7 +34,8 @@
           "microphonePermission": "DressMe utilise votre micro pour enregistrer le son des reels.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

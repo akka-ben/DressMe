@@ -1,0 +1,35 @@
+Correction: BcryptLoginFix_2026-05-04
+
+Probleme observe:
+- Le backend demarrait correctement avec uvicorn.
+- Le login retournait 500 Internal Server Error.
+- La stacktrace venait de passlib.handlers.bcrypt.
+- La version bcrypt 5.0.0 installee automatiquement etait incompatible avec passlib 1.7.4.
+
+Modification realisee:
+- Fichier modifie: backend/pyproject.toml
+- Ajout de la dependance explicite:
+  bcrypt==4.0.1
+
+Pourquoi:
+- passlib 1.7.4 est compatible avec bcrypt 4.0.1.
+- bcrypt 5.0.0 leve une erreur pendant la verification passlib:
+  ValueError: password cannot be longer than 72 bytes
+- Cette erreur faisait echouer /api/v1/auth/login avec une erreur 500.
+
+Actions executees:
+- Reinstallation du backend dans le venv:
+  .venv/bin/python -m pip install -e backend
+- Downgrade effectue:
+  bcrypt 5.0.0 -> bcrypt 4.0.1
+
+Verification:
+- Test local de hash/verify effectue avec app.core.security.
+- Resultat:
+  verify_password("password123", hash_password("password123")) == True
+
+Action necessaire cote serveur:
+- Arreter uvicorn avec CTRL+C.
+- Relancer:
+  source .venv/bin/activate
+  uvicorn app.main:app --reload --app-dir backend --host 0.0.0.0 --port 8000

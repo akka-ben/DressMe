@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class UserDTO(BaseModel):
     id: str
+    username: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     email: EmailStr | None = None
@@ -17,6 +18,9 @@ class ProfileDTO(UserDTO):
     follower_count: int = 0
     following_count: int = 0
     post_count: int = 0
+    is_private: bool = False
+    follow_status: Literal["self", "not_following", "following", "requested"] = "not_following"
+    can_view_posts: bool = True
 
 
 class CommentDTO(BaseModel):
@@ -68,6 +72,29 @@ class CreatePostInput(BaseModel):
     garment_tags: list[str] = Field(default_factory=list, max_length=12)
 
 
+class SearchHashtagDTO(BaseModel):
+    tag: str
+    post_count: int = 0
+    latest_post: PostDTO | None = None
+
+
+class SearchPlaceDTO(BaseModel):
+    id: str
+    name: str
+    subtitle: str | None = None
+    post_count: int = 0
+    latest_post: PostDTO | None = None
+
+
+class SearchResultDTO(BaseModel):
+    query: str = ""
+    users: list[UserDTO] = Field(default_factory=list)
+    hashtags: list[SearchHashtagDTO] = Field(default_factory=list)
+    videos: list[PostDTO] = Field(default_factory=list)
+    places: list[SearchPlaceDTO] = Field(default_factory=list)
+    top_posts: list[PostDTO] = Field(default_factory=list)
+
+
 class StoryDTO(BaseModel):
     id: str
     author: UserDTO
@@ -78,6 +105,66 @@ class StoryDTO(BaseModel):
     viewed_by_me: bool = False
     created_at: datetime
     expires_at: datetime
+
+
+class LiveSessionDTO(BaseModel):
+    id: str
+    host: UserDTO
+    title: str | None = None
+    status: Literal["live", "ended"] = "live"
+    viewer_count: int = 0
+    started_at: datetime
+    ended_at: datetime | None = None
+
+
+class ActivityNotificationDTO(BaseModel):
+    id: str
+    tab: Literal["you", "following"] = "you"
+    type: Literal[
+        "like",
+        "comment",
+        "save",
+        "share",
+        "follow",
+        "follow_request",
+        "mention",
+        "tag",
+        "live",
+        "story",
+        "suggestion",
+        "shopping",
+        "post",
+    ]
+    filter_key: Literal[
+        "all",
+        "requests",
+        "likes",
+        "comments",
+        "mentions",
+        "follows",
+        "live",
+        "stories",
+        "shopping",
+        "suggestions",
+        "shares",
+        "saves",
+    ] = "all"
+    actors: list[UserDTO] = Field(default_factory=list)
+    actor_count: int = 0
+    title: str
+    body: str | None = None
+    target_type: Literal["post", "profile", "live", "story", "shopping", "none"] = "none"
+    target_id: str | None = None
+    target_post: PostDTO | None = None
+    thumbnail_url: str | None = None
+    action: Literal["follow_back", "view_request", "open", "none"] = "none"
+    action_label: str | None = None
+    created_at: datetime
+    read: bool = False
+
+
+class CreateLiveSessionInput(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
 
 
 class CreateStoryInput(BaseModel):

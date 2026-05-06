@@ -26,6 +26,7 @@ import {
   ZapOff,
 } from "lucide-react-native";
 
+import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
@@ -44,6 +45,7 @@ type SelectedMedia = {
 type CreatePostScreenProps = {
   onClose?: () => void;
   onCreated?: (createdType: "post" | "reel" | "story") => void;
+  onOpenLive?: () => void;
 };
 
 const modeLabels: Record<ComposerMode, string> = {
@@ -60,7 +62,15 @@ const defaultCaptionByMode: Record<ComposerMode, string> = {
   live: "Live DressMe",
 };
 
-export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) {
+const liveCommentTimeline = [
+  { at: 3, username: "amina_style", text: "Le look est canon." },
+  { at: 7, username: "karim_looks", text: "Montre les chaussures." },
+  { at: 12, username: "leila_chic", text: "La couleur burgundy va trop bien." },
+  { at: 18, username: "nadia_glam", text: "Tu peux tourner la camera ?" },
+  { at: 25, username: "sophialaurent", text: "Tres editorial." },
+];
+
+export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostScreenProps) {
   const { token } = useAuth();
   const cameraRef = useRef<CameraView | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -77,10 +87,13 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
   const [isCapturing, setIsCapturing] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isLive, setIsLive] = useState(false);
+  const [liveSeconds, setLiveSeconds] = useState(0);
+  const [liveViewerCount, setLiveViewerCount] = useState(0);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const isVideoMode = activeMode === "reel";
-  const needsMicrophone = activeMode === "reel";
+  const isVideoMode = activeMode === "reel" || activeMode === "live";
+  const needsMicrophone = activeMode === "reel" || activeMode === "live";
   const hasCameraAccess = Boolean(cameraPermission?.granted);
   const hasMicrophoneAccess = !needsMicrophone || Boolean(microphonePermission?.granted);
 
@@ -110,6 +123,29 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
     return () => clearInterval(interval);
   }, [isRecording]);
 
+  useEffect(() => {
+    if (!isLive) {
+      setLiveSeconds(0);
+      setLiveViewerCount(0);
+      return undefined;
+    }
+
+    const startedAt = Date.now();
+    setLiveViewerCount(1);
+    const interval = setInterval(() => {
+      const elapsedSeconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      setLiveSeconds(elapsedSeconds);
+      setLiveViewerCount(Math.min(42, 1 + Math.floor(elapsedSeconds / 4) * 2));
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isLive]);
+
+  const visibleLiveComments = useMemo(
+    () => liveCommentTimeline.filter((comment) => comment.at <= liveSeconds).slice(-3),
+    [liveSeconds],
+  );
+
   const parsedTags = useMemo(
     () =>
       hashtags
@@ -132,8 +168,6 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
   );
 
   const publishableMode = activeMode === "post" || activeMode === "reel" || activeMode === "story";
-  const canPublish = Boolean(token && selectedMedia && publishableMode && !isPublishing);
-
   const selectMedia = (media: SelectedMedia) => {
     setSelectedMedia(media);
     setCaption("");
@@ -151,12 +185,18 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
     if (isRecording) {
       cameraRef.current?.stopRecording();
     }
+    if (isLive) {
+      setIsLive(false);
+    }
     onClose?.();
   };
 
   const switchMode = (mode: ComposerMode) => {
     if (isRecording) {
       cameraRef.current?.stopRecording();
+    }
+    if (isLive) {
+      setIsLive(false);
     }
     setActiveMode(mode);
     setMessage(getCameraMessage(mode));
@@ -176,7 +216,7 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: activeMode === "reel" ? ["videos"] : ["images"],
+        mediaTypes: getGalleryMediaTypes(activeMode),
         allowsEditing: false,
         quality: 0.9,
         videoMaxDuration: 90,
@@ -284,7 +324,11 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
 
   const handleCapturePress = async () => {
     if (activeMode === "live") {
-      Alert.alert("Live", "L'interface Live est prete cote mobile. Le streaming backend sera branche dans une phase dediee.");
+      if (onOpenLive) {
+        onOpenLive();
+        return;
+      }
+      await toggleLiveSession();
       return;
     }
 
@@ -296,6 +340,28 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
     await capturePhoto();
   };
 
+  const toggleLiveSession = async () => {
+    if (isLive) {
+      setIsLive(false);
+      setMessage(`Live termine: ${formatRecordingTime(liveSeconds)}.`);
+      Alert.alert("Live termine", `Duree: ${formatRecordingTime(liveSeconds)} · Pic: ${liveViewerCount} spectateurs.`);
+      return;
+    }
+
+    if (!hasCameraAccess) {
+      await requestCameraPermission();
+      return;
+    }
+
+    if (!hasMicrophoneAccess) {
+      await requestMicrophonePermission();
+      return;
+    }
+
+    setIsLive(true);
+    setMessage("Live en direct. Appuie sur le bouton rouge pour terminer.");
+  };
+
   const resetToCamera = () => {
     setSelectedMedia(null);
     setComposerStep("camera");
@@ -303,6 +369,10 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
   };
 
   const publishPost = async () => {
+    if (isPublishing) {
+      return;
+    }
+
     if (!token) {
       Alert.alert("Session requise", "Connecte-toi avant de publier.");
       return;
@@ -365,9 +435,13 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
         token,
       );
 
-      setMessage(mediaType === "video" ? "Reel publie." : "Post publie.");
-      Alert.alert(mediaType === "video" ? "Reel publie" : "Post publie", "Le media est enregistre dans MongoDB.");
-      onCreated?.(mediaType === "video" ? "reel" : "post");
+      const createdType = activeMode === "reel" ? "reel" : "post";
+      setMessage(createdType === "reel" ? "Reel publie." : "Post publie.");
+      Alert.alert(
+        createdType === "reel" ? "Reel publie" : "Post publie",
+        "Le media est enregistre dans MongoDB.",
+      );
+      onCreated?.(createdType);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Impossible de publier ce media.";
       setMessage(errorMessage);
@@ -404,8 +478,14 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
                   {selectedMedia?.source === "camera" ? "Capture camera" : "Depuis la galerie"}
                 </Text>
               </View>
-              <Pressable disabled={!canPublish} onPress={() => void publishPost()}>
-                <Text style={[styles.publish, !canPublish && styles.publishDisabled]}>
+              <Pressable
+                disabled={isPublishing}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Publier le media"
+                onPress={() => void publishPost()}
+              >
+                <Text style={[styles.publish, isPublishing && styles.publishDisabled]}>
                   {isPublishing ? "..." : "Publier"}
                 </Text>
               </Pressable>
@@ -414,6 +494,16 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
             <View style={styles.previewFrame}>
               {selectedMedia?.mediaType === "image" ? (
                 <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} resizeMode="cover" />
+              ) : selectedMedia?.uri ? (
+                <DressMeVideoPlayer
+                  uri={selectedMedia.uri}
+                  style={styles.previewImage}
+                  autoPlay
+                  loop
+                  muted
+                  nativeControls
+                  contentFit="cover"
+                />
               ) : (
                 <View style={styles.videoPreview}>
                   <Video size={58} color={colors.white} />
@@ -495,7 +585,7 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
                       ? "Publier le reel"
                       : "Publier"
               }
-              disabled={!canPublish}
+              disabled={isPublishing}
               onPress={() => void publishPost()}
             />
             <Text style={styles.note}>{message}</Text>
@@ -510,6 +600,7 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
       {hasCameraAccess ? (
         <CameraView
           ref={cameraRef}
+          pointerEvents="none"
           style={styles.cameraPreview}
           facing={cameraFacing}
           flash={flashEnabled ? "on" : "off"}
@@ -533,16 +624,30 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
 
       <View pointerEvents="box-none" style={styles.cameraOverlay}>
         <View style={styles.cameraTopBar}>
-          <Pressable style={styles.cameraIconButton} onPress={handleClose}>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={12}
+            onPressIn={handleClose}
+            pressRetentionOffset={16}
+            style={styles.cameraIconButton}
+          >
             <X size={28} color={colors.white} />
           </Pressable>
           <Pressable
+            accessibilityRole="button"
+            hitSlop={12}
+            pressRetentionOffset={12}
             style={styles.cameraIconButton}
             onPress={() => setFlashEnabled((enabled) => !enabled)}
           >
             {flashEnabled ? <Zap size={26} color={colors.white} /> : <ZapOff size={26} color={colors.white} />}
           </Pressable>
-          <Pressable style={styles.cameraIconButton}>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={12}
+            pressRetentionOffset={12}
+            style={styles.cameraIconButton}
+          >
             <Settings size={26} color={colors.white} />
           </Pressable>
         </View>
@@ -561,9 +666,38 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
           </View>
         ) : null}
 
+        {isLive ? (
+          <View style={styles.liveHud}>
+            <View style={styles.liveHudTop}>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveBadgeText}>EN DIRECT</Text>
+              </View>
+              <Text style={styles.liveTimer}>{formatRecordingTime(liveSeconds)}</Text>
+              <Text style={styles.liveViewerText}>{liveViewerCount} spectateurs</Text>
+            </View>
+            <View style={styles.liveComments}>
+              {visibleLiveComments.map((comment) => (
+                <View key={`${comment.username}-${comment.at}`} style={styles.liveCommentBubble}>
+                  <Text style={styles.liveCommentText}>
+                    <Text style={styles.liveCommentUser}>@{comment.username} </Text>
+                    {comment.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.cameraBottomPanel}>
           <View style={styles.captureRow}>
-            <Pressable style={styles.galleryButton} onPress={() => void openGallery()}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={10}
+              pressRetentionOffset={12}
+              style={styles.galleryButton}
+              onPress={() => void openGallery()}
+            >
               {selectedMedia?.mediaType === "image" ? (
                 <Image source={{ uri: selectedMedia.uri }} style={styles.galleryThumb} />
               ) : (
@@ -572,10 +706,14 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
             </Pressable>
 
             <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              pressRetentionOffset={12}
               style={[
                 styles.captureButton,
                 activeMode === "live" && styles.liveCaptureButton,
                 isRecording && styles.recordingCaptureButton,
+                isLive && styles.liveActiveCaptureButton,
               ]}
               onPress={() => void handleCapturePress()}
               disabled={isCapturing}
@@ -585,6 +723,7 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
                   styles.captureInner,
                   activeMode === "reel" && styles.reelCaptureInner,
                   activeMode === "live" && styles.liveCaptureInner,
+                  isLive && styles.liveActiveCaptureInner,
                 ]}
               >
                 {activeMode === "live" ? <Radio size={24} color={colors.white} /> : null}
@@ -592,6 +731,9 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
             </Pressable>
 
             <Pressable
+              accessibilityRole="button"
+              hitSlop={10}
+              pressRetentionOffset={12}
               style={styles.switchCameraButton}
               onPress={() => setCameraFacing((facing) => (facing === "back" ? "front" : "back"))}
               disabled={isRecording}
@@ -602,7 +744,14 @@ export function CreatePostScreen({ onClose, onCreated }: CreatePostScreenProps) 
 
           <View style={styles.modeRail}>
             {(Object.keys(modeLabels) as ComposerMode[]).map((mode) => (
-              <Pressable key={mode} onPress={() => switchMode(mode)} style={styles.modeButton}>
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={8}
+                key={mode}
+                onPress={() => switchMode(mode)}
+                pressRetentionOffset={12}
+                style={styles.modeButton}
+              >
                 <Text style={[styles.modeText, activeMode === mode && styles.modeTextActive]}>
                   {modeLabels[mode]}
                 </Text>
@@ -627,14 +776,22 @@ function SideTool({ label, text }: { label: string; text: string }) {
 function getCameraMessage(mode: ComposerMode): string {
   switch (mode) {
     case "post":
-      return "Capture une photo ou choisis une image depuis la galerie.";
+      return "Capture une photo ou choisis une photo/video depuis la galerie.";
     case "story":
-      return "Capture une story. Le backend Story sera connecte dans une phase dediee.";
+      return "Capture une story ou choisis une photo/video depuis la galerie.";
     case "reel":
       return "Appuie pour enregistrer un reel, puis appuie encore pour terminer.";
     case "live":
-      return "Interface live prete. Streaming backend a connecter plus tard.";
+      return "Appuie sur le bouton rouge pour demarrer un live.";
   }
+}
+
+function getGalleryMediaTypes(mode: ComposerMode): Array<"images" | "videos"> {
+  if (mode === "reel") {
+    return ["videos"];
+  }
+
+  return ["images", "videos"];
 }
 
 function buildMediaFilename(mediaType: "image" | "video", mimeType: string): string {
@@ -672,6 +829,7 @@ const styles = StyleSheet.create({
   },
   cameraPreview: {
     flex: 1,
+    zIndex: 0,
   },
   permissionState: {
     flex: 1,
@@ -707,11 +865,15 @@ const styles = StyleSheet.create({
   },
   cameraOverlay: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    elevation: 20,
     justifyContent: "space-between",
   },
   cameraTopBar: {
     paddingTop: Platform.OS === "ios" ? 48 : 24,
     paddingHorizontal: 18,
+    zIndex: 30,
+    elevation: 30,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -773,10 +935,78 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 12,
   },
+  liveHud: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    bottom: 178,
+    gap: 10,
+  },
+  liveHudTop: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: "#E53935",
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.white,
+  },
+  liveBadgeText: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 11,
+  },
+  liveTimer: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  liveViewerText: {
+    color: "rgba(255,255,255,0.84)",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  liveComments: {
+    gap: 7,
+    maxWidth: "82%",
+  },
+  liveCommentBubble: {
+    alignSelf: "flex-start",
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(0,0,0,0.42)",
+  },
+  liveCommentText: {
+    color: colors.white,
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  liveCommentUser: {
+    fontWeight: "900",
+  },
   cameraBottomPanel: {
     paddingHorizontal: 20,
     paddingBottom: Platform.OS === "ios" ? 32 : 20,
     paddingTop: 18,
+    zIndex: 30,
+    elevation: 30,
     backgroundColor: "rgba(4,8,10,0.92)",
     gap: 18,
   },
@@ -813,6 +1043,9 @@ const styles = StyleSheet.create({
   liveCaptureButton: {
     borderColor: "#FF3B30",
   },
+  liveActiveCaptureButton: {
+    borderColor: colors.white,
+  },
   recordingCaptureButton: {
     borderColor: "#FF3B30",
   },
@@ -828,6 +1061,12 @@ const styles = StyleSheet.create({
   liveCaptureInner: {
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#FF3B30",
+  },
+  liveActiveCaptureInner: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: "#FF3B30",
   },
   switchCameraButton: {

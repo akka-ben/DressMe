@@ -13,6 +13,7 @@ import {
   Image,
   ListRenderItem,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   Share,
@@ -33,6 +34,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   PlusSquare,
+  Radio,
   Send,
   Share2,
   Sparkles,
@@ -40,18 +42,16 @@ import {
   X,
 } from "lucide-react-native";
 
+import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
 import {
   aiSuggestions,
-  FashionStory,
-  getUser,
-  notifications,
-  stories as initialStories,
   users as demoUsers,
 } from "../data/fashionData";
+import { NotificationsScreen } from "./NotificationsScreen";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
-import type { Post, Story, User } from "../types/contracts";
+import type { LiveSession, Post, Story, User } from "../types/contracts";
 
 const filters = ["Tous", "#casual", "#soirée", "#streetwear", "#glam", "#vintage"];
 const FEED_PAGE_SIZE = 10;
@@ -70,6 +70,7 @@ type FeedPost = {
   sourcePostId: string;
   author: FeedAuthor;
   image: string;
+  mediaType: "image" | "video";
   description: string;
   hashtags: string[];
   likes: number;
@@ -90,23 +91,34 @@ type FeedStory = {
   userId: string;
   image: string;
   mediaType: "image" | "video";
+  createdAt?: string;
   timestamp: string;
   viewed: boolean;
   viewerCount: number;
   author: FeedAuthor;
 };
 
+type FeedStoryGroup = {
+  id: string;
+  userId: string;
+  author: FeedAuthor;
+  stories: FeedStory[];
+  viewed: boolean;
+};
+
 type HomeFeedScreenProps = {
   onOpenPost?: (postId: string) => void;
   onOpenCreate?: () => void;
+  onOpenLive?: (session: LiveSession) => void;
 };
 
-export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps) {
+export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive }: HomeFeedScreenProps) {
   const { token, user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [stories, setStories] = useState<FeedStory[]>(() => initialStories.map(mapFashionStory));
+  const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
+  const [stories, setStories] = useState<FeedStoryGroup[]>([]);
   const [activeFilter, setActiveFilter] = useState("Tous");
-  const [activeStory, setActiveStory] = useState<FeedStory | null>(null);
+  const [activeStoryGroup, setActiveStoryGroup] = useState<FeedStoryGroup | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStylist, setShowStylist] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -115,9 +127,8 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState("");
   const [actionPost, setActionPost] = useState<FeedPost | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const loadLockRef = useRef(false);
-
-  const unreadNotifications = notifications.filter((item) => !item.read).length;
 
   const visiblePosts = useMemo(() => {
     if (activeFilter === "Tous") {
@@ -128,7 +139,9 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
 
   useEffect(() => {
     visiblePosts.slice(0, 4).forEach((post) => {
-      void Image.prefetch(post.image);
+      if (!isVideoUrl(post.image)) {
+        void Image.prefetch(post.image);
+      }
       post.pollOptions?.forEach((option) => void Image.prefetch(option.image));
     });
   }, [visiblePosts]);
@@ -156,10 +169,30 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
     });
     setStories(
       apiStories.length
-        ? apiStories.map((story) => mapApiStory(story, user?.id))
-        : initialStories.map(mapFashionStory),
+        ? groupFeedStories(apiStories.map((story) => mapApiStory(story, user?.id)))
+        : [],
     );
   }, [token, user?.id]);
+
+  const fetchLiveSessions = useCallback(async () => {
+    if (!token) {
+      setLiveSessions([]);
+      return;
+    }
+
+    const sessions = await client.getLiveSessions({ token, limit: 12 });
+    setLiveSessions(sessions);
+  }, [token]);
+
+  const fetchNotificationCount = useCallback(async () => {
+    if (!token) {
+      setUnreadNotifications(0);
+      return;
+    }
+
+    const activity = await client.getNotifications({ token, limit: 60 });
+    setUnreadNotifications(activity.filter((item) => !item.read).length);
+  }, [token]);
 
   useEffect(() => {
     let mounted = true;
@@ -178,11 +211,25 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
         }
       });
     fetchStories().catch(() => undefined);
+    fetchLiveSessions().catch(() => undefined);
+    fetchNotificationCount().catch(() => undefined);
 
     return () => {
       mounted = false;
     };
-  }, [fetchFeedPage, fetchStories]);
+  }, [fetchFeedPage, fetchLiveSessions, fetchNotificationCount, fetchStories]);
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      fetchLiveSessions().catch(() => undefined);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [fetchLiveSessions, token]);
 
   const toggleLike = useCallback((feedId: string) => {
     const targetPost = posts.find((post) => post.feedId === feedId);
@@ -320,20 +367,31 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
     );
   }, []);
 
-  const openStory = useCallback((story: FeedStory) => {
-    setActiveStory(story);
+  const openStoryGroup = useCallback((storyGroup: FeedStoryGroup) => {
+    setActiveStoryGroup(storyGroup);
     setStories((current) =>
-      current.map((item) => (item.id === story.id ? { ...item, viewed: true } : item)),
+      current.map((item) =>
+        item.id === storyGroup.id
+          ? {
+              ...item,
+              viewed: true,
+              stories: item.stories.map((story, index) =>
+                index === 0 ? { ...story, viewed: true } : story,
+              ),
+            }
+          : item,
+      ),
     );
-    const isOwnStory = story.userId === "me" || story.author.id === user?.id;
-    if (token && story.sourceStoryId && !isOwnStory) {
-      client.markStoryViewed(story.sourceStoryId, token).catch(() => undefined);
+    const firstStory = storyGroup.stories[0];
+    const isOwnStory = storyGroup.userId === "me" || storyGroup.author.id === user?.id;
+    if (token && firstStory?.sourceStoryId && !isOwnStory) {
+      client.markStoryViewed(firstStory.sourceStoryId, token).catch(() => undefined);
     }
   }, [token, user?.id]);
 
   const refreshFeed = useCallback(() => {
     setRefreshing(true);
-    Promise.all([fetchFeedPage(0, true), fetchStories()])
+    Promise.all([fetchFeedPage(0, true), fetchStories(), fetchLiveSessions(), fetchNotificationCount()])
       .catch((error: unknown) => {
         setFeedError(error instanceof Error ? error.message : "Impossible de rafraichir le feed.");
       })
@@ -341,7 +399,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
       setRefreshing(false);
       loadLockRef.current = false;
       });
-  }, [fetchFeedPage, fetchStories]);
+  }, [fetchFeedPage, fetchLiveSessions, fetchNotificationCount, fetchStories]);
 
   const loadMorePosts = useCallback(() => {
     if (loadLockRef.current || loadingMore || !hasMore || initialLoading) {
@@ -376,6 +434,36 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
     [onOpenPost, sharePost, toggleLike, toggleSave, votePoll],
   );
 
+  const markStoryAsViewed = useCallback((storyId: string) => {
+    setStories((current) => {
+      let changed = false;
+      const nextStories = current.map((group) => {
+        let groupChanged = false;
+        const groupStories = group.stories.map((story) => {
+          if (story.id !== storyId || story.viewed) {
+            return story;
+          }
+
+          changed = true;
+          groupChanged = true;
+          return { ...story, viewed: true };
+        });
+
+        if (!groupChanged) {
+          return group;
+        }
+
+        return {
+          ...group,
+          stories: groupStories,
+          viewed: groupStories.every((story) => story.viewed),
+        };
+      });
+
+      return changed ? nextStories : current;
+    });
+  }, []);
+
   return (
     <View style={styles.shell}>
       <FlatList
@@ -388,12 +476,14 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
         ListHeaderComponent={
           <FeedHeader
             activeFilter={activeFilter}
+            liveSessions={liveSessions}
             stories={stories}
             unreadNotifications={unreadNotifications}
             onFilterChange={setActiveFilter}
             onOpenCreate={onOpenCreate}
+            onOpenLive={onOpenLive}
             onOpenNotifications={() => setShowNotifications(true)}
-            onOpenStory={openStory}
+            onOpenStory={openStoryGroup}
             onOpenStylist={() => setShowStylist(true)}
           />
         }
@@ -419,18 +509,24 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
         maxToRenderPerBatch={4}
         windowSize={7}
         updateCellsBatchingPeriod={60}
-        removeClippedSubviews
+        removeClippedSubviews={Platform.OS === "android"}
         onEndReached={loadMorePosts}
         onEndReachedThreshold={0.45}
       />
 
       <StoryViewer
-        story={activeStory}
+        storyGroup={activeStoryGroup}
         token={token ?? undefined}
         currentUserId={user?.id}
-        onClose={() => setActiveStory(null)}
+        onViewedStory={markStoryAsViewed}
+        onClose={() => setActiveStoryGroup(null)}
       />
-      <NotificationsModal visible={showNotifications} onClose={() => setShowNotifications(false)} />
+      <NotificationsModal
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        onOpenPost={onOpenPost}
+        onUnreadChange={setUnreadNotifications}
+      />
       <StylistModal visible={showStylist} onClose={() => setShowStylist(false)} />
       <PostActionSheet
         post={actionPost}
@@ -466,21 +562,25 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate }: HomeFeedScreenProps
 
 function FeedHeader({
   activeFilter,
+  liveSessions,
   stories,
   unreadNotifications,
   onFilterChange,
   onOpenCreate,
+  onOpenLive,
   onOpenNotifications,
   onOpenStory,
   onOpenStylist,
 }: {
   activeFilter: string;
-  stories: FeedStory[];
+  liveSessions: LiveSession[];
+  stories: FeedStoryGroup[];
   unreadNotifications: number;
   onFilterChange: (filter: string) => void;
   onOpenCreate?: () => void;
+  onOpenLive?: (session: LiveSession) => void;
   onOpenNotifications: () => void;
-  onOpenStory: (story: FeedStory) => void;
+  onOpenStory: (storyGroup: FeedStoryGroup) => void;
   onOpenStylist: () => void;
 }) {
   return (
@@ -492,14 +592,35 @@ function FeedHeader({
         </View>
         <View style={styles.headerActions}>
           {onOpenCreate ? (
-            <Pressable style={styles.iconButton} onPress={onOpenCreate}>
+            <Pressable
+              style={styles.iconButton}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Creer une publication"
+              pressRetentionOffset={12}
+              onPress={onOpenCreate}
+            >
               <PlusSquare size={20} color={colors.burgundy} />
             </Pressable>
           ) : null}
-          <Pressable style={styles.iconButton} onPress={onOpenStylist}>
+          <Pressable
+            style={styles.iconButton}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir le stylist IA"
+            pressRetentionOffset={12}
+            onPress={onOpenStylist}
+          >
             <Sparkles size={20} color={colors.burgundy} />
           </Pressable>
-          <Pressable style={styles.iconButton} onPress={onOpenNotifications}>
+          <Pressable
+            style={styles.iconButton}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir les notifications"
+            pressRetentionOffset={12}
+            onPress={onOpenNotifications}
+          >
             <Bell size={20} color={colors.burgundy} />
             {unreadNotifications ? (
               <Text style={styles.notificationBadge}>{unreadNotifications}</Text>
@@ -507,6 +628,37 @@ function FeedHeader({
           </Pressable>
         </View>
       </View>
+
+      {liveSessions.length ? (
+        <FlatList
+          horizontal
+          data={liveSessions}
+          keyExtractor={(item) => item.id}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.liveStrip}
+          renderItem={({ item }) => (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={6}
+              pressRetentionOffset={12}
+              style={styles.liveCard}
+              onPress={() => onOpenLive?.(item)}
+            >
+              <View style={styles.liveAvatarWrap}>
+                <Image source={{ uri: avatarForUser(item.host) }} style={styles.liveAvatar} />
+                <View style={styles.liveMiniBadge}>
+                  <Radio size={10} color={colors.white} />
+                  <Text style={styles.liveMiniBadgeText}>LIVE</Text>
+                </View>
+              </View>
+              <View style={styles.liveInfo}>
+                <Text numberOfLines={1} style={styles.liveTitle}>{displayLiveHostName(item.host)}</Text>
+                <Text style={styles.liveMeta}>{item.viewerCount} spectateurs</Text>
+              </View>
+            </Pressable>
+          )}
+        />
+      ) : null}
 
       <FlatList
         horizontal
@@ -517,7 +669,13 @@ function FeedHeader({
         renderItem={({ item }) => {
           const user = item.author;
           return (
-            <Pressable style={styles.storyItem} onPress={() => onOpenStory(item)}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={6}
+              pressRetentionOffset={12}
+              style={styles.storyItem}
+              onPress={() => onOpenStory(item)}
+            >
               <LinearGradient
                 colors={item.viewed ? [colors.border, colors.border] : [colors.burgundy, colors.roseLight]}
                 style={styles.storyRing}
@@ -542,6 +700,9 @@ function FeedHeader({
           const active = item === activeFilter;
           return (
             <Pressable
+              accessibilityRole="button"
+              hitSlop={6}
+              pressRetentionOffset={12}
               onPress={() => onFilterChange(item)}
               style={[styles.filterPill, active && styles.filterPillActive]}
             >
@@ -561,6 +722,7 @@ function mapApiPost(post: Post): FeedPost {
     sourcePostId: post.id,
     author: mapApiUserToAuthor(post.author),
     image: post.imageUrls[0] ?? "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=900",
+    mediaType: post.mediaType,
     description: post.caption,
     hashtags: post.hashtags,
     likes: post.likeCount,
@@ -580,24 +742,12 @@ function mapApiPost(post: Post): FeedPost {
   };
 }
 
-function mapFashionStory(story: FashionStory): FeedStory {
-  const user = getUser(story.userId);
-  return {
-    id: story.id,
-    userId: story.userId,
-    image: story.image,
-    mediaType: "image",
-    timestamp: story.timestamp,
-    viewed: story.viewed,
-    viewerCount: 0,
-    author: {
-      id: user.id,
-      name: user.name,
-      username: user.username,
-      avatar: user.avatar,
-      verified: user.verified,
-    },
-  };
+function avatarForUser(user: User): string {
+  return user.avatarUrl || `https://api.dicebear.com/8.x/avataaars/png?seed=${encodeURIComponent(user.id)}`;
+}
+
+function displayLiveHostName(user: User): string {
+  return `${user.firstName} ${user.lastName}`.trim() || "DressMe Live";
 }
 
 function mapApiStory(story: Story, currentUserId?: string): FeedStory {
@@ -608,11 +758,62 @@ function mapApiStory(story: Story, currentUserId?: string): FeedStory {
     userId: currentUserId && story.author.id === currentUserId ? "me" : story.author.id,
     image: story.mediaUrl,
     mediaType: story.mediaType,
+    createdAt: story.createdAt,
     timestamp: formatRelativeDate(story.createdAt),
     viewed: story.viewedByMe,
     viewerCount: story.viewerCount,
     author,
   };
+}
+
+function groupFeedStories(stories: FeedStory[]): FeedStoryGroup[] {
+  const groupsByUser = new Map<string, FeedStoryGroup>();
+
+  stories.forEach((story) => {
+    const groupId = story.userId === "me" ? `me:${story.author.id}` : story.author.id || story.userId;
+    const existingGroup = groupsByUser.get(groupId);
+
+    if (existingGroup) {
+      existingGroup.stories.push(story);
+      existingGroup.viewed = existingGroup.stories.every((item) => item.viewed);
+      return;
+    }
+
+    groupsByUser.set(groupId, {
+      id: groupId,
+      userId: story.userId,
+      author: story.author,
+      stories: [story],
+      viewed: story.viewed,
+    });
+  });
+
+  return [...groupsByUser.values()]
+    .map((group) => ({
+      ...group,
+      stories: [...group.stories].sort((left, right) => storyTimeMs(left) - storyTimeMs(right)),
+      viewed: group.stories.every((story) => story.viewed),
+    }))
+    .sort((left, right) => {
+      if (left.userId === "me" && right.userId !== "me") {
+        return -1;
+      }
+      if (right.userId === "me" && left.userId !== "me") {
+        return 1;
+      }
+      return latestStoryTimeMs(right) - latestStoryTimeMs(left);
+    });
+}
+
+function storyTimeMs(story: FeedStory): number {
+  if (!story.createdAt) {
+    return 0;
+  }
+  return parseBackendDateMs(story.createdAt) ?? 0;
+}
+
+function latestStoryTimeMs(group: FeedStoryGroup): number {
+  return Math.max(...group.stories.map(storyTimeMs), 0);
 }
 
 function demoMentionFollowers(): FeedAuthor[] {
@@ -642,8 +843,8 @@ function mapApiUserToAuthor(user: User): FeedAuthor {
 }
 
 function formatRelativeDate(value: string): string {
-  const createdAt = new Date(value).getTime();
-  if (Number.isNaN(createdAt)) {
+  const createdAt = parseBackendDateMs(value);
+  if (createdAt === null) {
     return "maintenant";
   }
 
@@ -662,6 +863,27 @@ function formatRelativeDate(value: string): string {
   }
 
   return `${Math.floor(diffHours / 24)} j`;
+}
+
+function parseBackendDateMs(value: string): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const hasExplicitTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const normalizedValue = hasExplicitTimezone ? value : `${value}Z`;
+  const parsed = new Date(normalizedValue).getTime();
+
+  if (!Number.isNaN(parsed)) {
+    return parsed;
+  }
+
+  const fallbackParsed = new Date(value).getTime();
+  return Number.isNaN(fallbackParsed) ? null : fallbackParsed;
+}
+
+function isVideoUrl(url?: string): boolean {
+  return Boolean(url?.toLowerCase().split("?")[0].match(/\.(mp4|mov|m4v|webm)$/));
 }
 
 const PostCard = memo(function PostCard({
@@ -685,6 +907,7 @@ const PostCard = memo(function PostCard({
 }) {
   const user = post.author;
   const totalVotes = post.pollOptions?.reduce((sum, option) => sum + option.votes, 0) ?? 0;
+  const isVideo = post.mediaType === "video" || isVideoUrl(post.image);
 
   return (
     <View style={styles.postCard}>
@@ -704,9 +927,20 @@ const PostCard = memo(function PostCard({
         </Pressable>
       </View>
 
-      <Pressable onPress={onOpen}>
-        <Image source={{ uri: post.image }} style={styles.postImage} />
-      </Pressable>
+      {isVideo ? (
+        <View style={styles.feedVideoFrame}>
+          <DressMeVideoPlayer
+            uri={post.image}
+            style={styles.postVideo}
+            nativeControls
+            contentFit="cover"
+          />
+        </View>
+      ) : (
+        <Pressable onPress={onOpen}>
+          <Image source={{ uri: post.image }} style={styles.postImage} />
+        </Pressable>
+      )}
 
       {post.isPoll && post.pollOptions ? (
         <View style={styles.pollBox}>
@@ -870,16 +1104,19 @@ function FeedStatus({
 }
 
 function StoryViewer({
-  story,
+  storyGroup,
   token,
   currentUserId,
+  onViewedStory,
   onClose,
 }: {
-  story: FeedStory | null;
+  storyGroup: FeedStoryGroup | null;
   token?: string;
   currentUserId?: string;
+  onViewedStory: (storyId: string) => void;
   onClose: () => void;
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState("");
   const [liked, setLiked] = useState(false);
@@ -891,9 +1128,17 @@ function StoryViewer({
   const [loadingViewers, setLoadingViewers] = useState(false);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const progressRef = useRef(0);
+  const markedStoryIdsRef = useRef(new Set<string>());
+  const stories = storyGroup?.stories ?? [];
+  const activeStory = stories[activeIndex] ?? null;
 
-  const isOwnStory = Boolean(story && (story.userId === "me" || story.author.id === currentUserId));
+  const isOwnStory = Boolean(storyGroup && (storyGroup.userId === "me" || storyGroup.author.id === currentUserId));
   const timerPaused = showViewers || showMentions || showSendTargets;
+
+  useEffect(() => {
+    const firstUnseenIndex = storyGroup?.stories.findIndex((item) => !item.viewed) ?? -1;
+    setActiveIndex(firstUnseenIndex >= 0 ? firstUnseenIndex : 0);
+  }, [storyGroup?.id]);
 
   useEffect(() => {
     progressRef.current = 0;
@@ -905,14 +1150,49 @@ function StoryViewer({
     setShowSendTargets(false);
     setViewers([]);
     setFollowers([]);
-  }, [story?.id]);
+  }, [activeStory?.id]);
 
   useEffect(() => {
-    if (!story || timerPaused) {
+    if (!activeStory) {
+      return;
+    }
+    if (markedStoryIdsRef.current.has(activeStory.id)) {
+      return;
+    }
+
+    markedStoryIdsRef.current.add(activeStory.id);
+    onViewedStory(activeStory.id);
+    if (token && activeStory.sourceStoryId && !isOwnStory) {
+      client.markStoryViewed(activeStory.sourceStoryId, token).catch(() => undefined);
+    }
+  }, [activeStory?.id, activeStory?.sourceStoryId, isOwnStory, onViewedStory, token]);
+
+  const goToNextStory = useCallback(() => {
+    if (!storyGroup) {
+      return;
+    }
+    if (activeIndex < storyGroup.stories.length - 1) {
+      setActiveIndex((current) => current + 1);
+      return;
+    }
+    onClose();
+  }, [activeIndex, onClose, storyGroup]);
+
+  const goToPreviousStory = useCallback(() => {
+    if (activeIndex > 0) {
+      setActiveIndex((current) => current - 1);
+      return;
+    }
+    progressRef.current = 0;
+    setProgress(0);
+  }, [activeIndex]);
+
+  useEffect(() => {
+    if (!activeStory || timerPaused) {
       return undefined;
     }
 
-    const durationMs = story.mediaType === "video" ? 15000 : 8000;
+    const durationMs = activeStory.mediaType === "video" ? 15000 : 8000;
     const startedAt = Date.now() - progressRef.current * durationMs;
     const interval = setInterval(() => {
       const nextProgress = Math.min(1, (Date.now() - startedAt) / durationMs);
@@ -920,15 +1200,15 @@ function StoryViewer({
       setProgress(nextProgress);
       if (nextProgress >= 1) {
         clearInterval(interval);
-        onClose();
+        goToNextStory();
       }
     }, 80);
 
     return () => clearInterval(interval);
-  }, [onClose, story, timerPaused]);
+  }, [activeStory, goToNextStory, timerPaused]);
 
   const loadViewers = async () => {
-    if (!story?.sourceStoryId || !token) {
+    if (!activeStory?.sourceStoryId || !token) {
       setViewers([]);
       setShowViewers(true);
       return;
@@ -937,7 +1217,7 @@ function StoryViewer({
     setLoadingViewers(true);
     setShowViewers(true);
     try {
-      const apiViewers = await client.getStoryViewers(story.sourceStoryId, token);
+      const apiViewers = await client.getStoryViewers(activeStory.sourceStoryId, token);
       setViewers(apiViewers.map(mapApiUserToAuthor));
     } catch (error) {
       Alert.alert(
@@ -990,34 +1270,68 @@ function StoryViewer({
     setShowSendTargets(false);
   };
 
-  if (!story) {
+  if (!storyGroup || !activeStory) {
     return null;
   }
 
-  const user = story.author;
+  const user = storyGroup.author;
+  const activeStoryTimestamp = activeStory.createdAt ? formatRelativeDate(activeStory.createdAt) : activeStory.timestamp;
+  const activeStoryIsVideo = activeStory.mediaType === "video" || isVideoUrl(activeStory.image);
   const progressWidth = `${Math.round(progress * 100)}%` as `${number}%`;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.storyModal}>
-        <Image source={{ uri: story.image }} style={styles.storyFullImage} />
+        {activeStoryIsVideo ? (
+          <DressMeVideoPlayer
+            uri={activeStory.image}
+            style={styles.storyFullImage}
+            autoPlay
+            nativeControls={false}
+            contentFit="contain"
+          />
+        ) : (
+          <Image source={{ uri: activeStory.image }} style={styles.storyFullImage} />
+        )}
+        <View style={styles.storyTapLayer} pointerEvents="box-none">
+          <Pressable style={styles.storyTapLeft} onPress={goToPreviousStory} />
+          <Pressable style={styles.storyTapRight} onPress={goToNextStory} />
+        </View>
 
         <LinearGradient colors={["rgba(0,0,0,0.88)", "rgba(0,0,0,0.18)", "transparent"]} style={styles.storyTopOverlay}>
-          <View style={styles.storyProgressTrack}>
-            <View style={[styles.storyProgressFill, { width: progressWidth }]} />
+          <View style={styles.storyProgressRow}>
+            {stories.map((storyItem, index) => {
+              const fillWidth =
+                index < activeIndex
+                  ? "100%"
+                  : index === activeIndex
+                    ? progressWidth
+                    : "0%";
+              return (
+                <View key={storyItem.id} style={styles.storyProgressTrack}>
+                  <View style={[styles.storyProgressFill, { width: fillWidth as `${number}%` }]} />
+                </View>
+              );
+            })}
           </View>
           <View style={styles.storyViewerHeader}>
             <Image source={{ uri: user.avatar }} style={styles.storyViewerAvatar} />
             <View style={styles.storyHeaderText}>
               <Text style={styles.storyViewerName}>{isOwnStory ? "Your story" : user.name}</Text>
-              <Text style={styles.storyViewerTime}>{story.timestamp}</Text>
+              <Text style={styles.storyViewerTime}>{activeStoryTimestamp}</Text>
             </View>
             {isOwnStory ? (
               <Pressable style={styles.storyHeaderIcon} onPress={() => Alert.alert("Options", "Options de story a connecter dans la phase suivante.")}>
                 <MoreHorizontal size={25} color={colors.white} />
               </Pressable>
             ) : null}
-            <Pressable style={styles.storyHeaderIcon} onPress={onClose}>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={12}
+              onPressIn={onClose}
+              pressRetentionOffset={16}
+              style={styles.storyHeaderIcon}
+            >
               <X size={30} color={colors.white} />
             </Pressable>
           </View>
@@ -1029,13 +1343,13 @@ function StoryViewer({
               <StoryOwnerAction
                 icon={<Eye size={22} color={colors.white} />}
                 label="Activite"
-                subLabel={`${story.viewerCount} vues`}
+                subLabel={`${activeStory.viewerCount} vues`}
                 onPress={() => void loadViewers()}
               />
               <StoryOwnerAction
                 icon={<Share2 size={22} color={colors.white} />}
                 label="Partager"
-                onPress={() => void Share.share({ message: story.image, url: story.image })}
+                onPress={() => void Share.share({ message: activeStory.image, url: activeStory.image })}
               />
               <StoryOwnerAction
                 icon={<AtSign size={24} color={colors.white} />}
@@ -1131,6 +1445,20 @@ function StoryOwnerAction({
   );
 }
 
+function SheetCloseButton({ onClose, color = colors.text }: { onClose: () => void; color?: string }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      hitSlop={12}
+      onPressIn={onClose}
+      pressRetentionOffset={16}
+      style={styles.sheetCloseButton}
+    >
+      <X size={24} color={color} />
+    </Pressable>
+  );
+}
+
 function StoryViewersSheet({
   visible,
   viewers,
@@ -1152,9 +1480,7 @@ function StoryViewersSheet({
               <Text style={styles.sheetTitle}>Activite</Text>
               <Text style={styles.storySheetSubtitle}>{viewers.length} vues</Text>
             </View>
-            <Pressable onPress={onClose}>
-              <X size={24} color={colors.text} />
-            </Pressable>
+            <SheetCloseButton onClose={onClose} />
           </View>
           {loading ? (
             <View style={styles.storySheetState}>
@@ -1215,9 +1541,7 @@ function StoryMentionSheet({
               <Text style={styles.sheetTitle}>{title}</Text>
               <Text style={styles.storySheetSubtitle}>{subtitle}</Text>
             </View>
-            <Pressable onPress={onClose}>
-              <X size={24} color={colors.text} />
-            </Pressable>
+            <SheetCloseButton onClose={onClose} />
           </View>
           {loading ? (
             <View style={styles.storySheetState}>
@@ -1247,34 +1571,24 @@ function StoryMentionSheet({
   );
 }
 
-function NotificationsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+function NotificationsModal({
+  visible,
+  onClose,
+  onOpenPost,
+  onUnreadChange,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onOpenPost?: (postId: string) => void;
+  onUnreadChange: (count: number) => void;
+}) {
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.sheetBackdrop}>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Notifications</Text>
-            <Pressable onPress={onClose}>
-              <X size={24} color={colors.text} />
-            </Pressable>
-          </View>
-          {notifications.map((item) => {
-            const user = getUser(item.userId);
-            return (
-              <View key={item.id} style={[styles.notificationRow, !item.read && styles.notificationUnread]}>
-                <Image source={{ uri: user.avatar }} style={styles.notificationAvatar} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.notificationText}>
-                    <Text style={styles.username}>{user.name}</Text> {item.text}
-                  </Text>
-                  <Text style={styles.postMeta}>{item.timestamp}</Text>
-                </View>
-                {!item.read ? <View style={styles.unreadDot} /> : null}
-              </View>
-            );
-          })}
-        </View>
-      </View>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <NotificationsScreen
+        onClose={onClose}
+        onOpenPost={onOpenPost}
+        onUnreadChange={onUnreadChange}
+      />
     </Modal>
   );
 }
@@ -1298,7 +1612,7 @@ function StylistModal({ visible, onClose }: { visible: boolean; onClose: () => v
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetBackdrop}>
         <View style={styles.sheetLarge}>
           <View style={styles.sheetHeader}>
@@ -1308,9 +1622,7 @@ function StylistModal({ visible, onClose }: { visible: boolean; onClose: () => v
               </LinearGradient>
               <Text style={styles.sheetTitle}>DressMe Stylist</Text>
             </View>
-            <Pressable onPress={onClose}>
-              <X size={24} color={colors.text} />
-            </Pressable>
+            <SheetCloseButton onClose={onClose} />
           </View>
           <Text style={styles.stylistIntro}>Votre assistant style personnel.</Text>
           <FlatList
@@ -1384,6 +1696,8 @@ const styles = StyleSheet.create({
   },
   headerBlock: {
     gap: 14,
+    zIndex: 30,
+    elevation: 30,
   },
   header: {
     position: "relative",
@@ -1410,6 +1724,8 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     gap: 8,
+    zIndex: 40,
+    elevation: 40,
   },
   iconButton: {
     width: 40,
@@ -1420,6 +1736,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: colors.border,
+    zIndex: 50,
+    elevation: 50,
   },
   notificationBadge: {
     position: "absolute",
@@ -1435,6 +1753,62 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     overflow: "hidden",
     paddingTop: 1,
+  },
+  liveStrip: {
+    gap: 10,
+    paddingHorizontal: 2,
+    paddingBottom: 2,
+  },
+  liveCard: {
+    width: 174,
+    minHeight: 76,
+    borderRadius: radius.lg,
+    backgroundColor: colors.black,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 10,
+  },
+  liveAvatarWrap: {
+    position: "relative",
+  },
+  liveAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.beige,
+  },
+  liveMiniBadge: {
+    position: "absolute",
+    left: -4,
+    right: -4,
+    bottom: -6,
+    borderRadius: 999,
+    minHeight: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    backgroundColor: "#E53935",
+  },
+  liveMiniBadgeText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  liveInfo: {
+    flex: 1,
+  },
+  liveTitle: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  liveMeta: {
+    color: "rgba(255,255,255,0.72)",
+    fontWeight: "700",
+    fontSize: 11,
+    marginTop: 3,
   },
   stories: {
     gap: 12,
@@ -1540,6 +1914,17 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 320,
     backgroundColor: colors.beige,
+  },
+  feedVideoFrame: {
+    width: "100%",
+    height: 320,
+    backgroundColor: colors.black,
+    overflow: "hidden",
+  },
+  postVideo: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.black,
   },
   pollBox: {
     padding: 12,
@@ -1677,6 +2062,20 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "contain",
   },
+  storyTapLayer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 140,
+    bottom: 150,
+    flexDirection: "row",
+  },
+  storyTapLeft: {
+    flex: 1,
+  },
+  storyTapRight: {
+    flex: 1,
+  },
   storyTopOverlay: {
     position: "absolute",
     top: 0,
@@ -1692,12 +2091,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   storyProgressTrack: {
-    width: "100%",
+    flex: 1,
     height: 3,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.35)",
     overflow: "hidden",
-    marginBottom: 14,
   },
   storyProgressFill: {
     height: 3,
@@ -1875,6 +2273,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  sheetCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sheetTitle: {
     fontFamily: fonts.display,

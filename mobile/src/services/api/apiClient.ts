@@ -2,14 +2,19 @@ import type { DressMeClient } from "../types";
 import type {
   AIRecommendation,
   AIRecommendationItem,
+  ActivityNotification,
   AuthMessage,
   AuthSession,
   Comment,
+  LiveSession,
   MediaUpload,
   Poll,
   PollOption,
   Post,
   Profile,
+  SearchHashtag,
+  SearchPlace,
+  SearchResults,
   Story,
   User,
 } from "../../types/contracts";
@@ -25,14 +30,18 @@ declare const process:
   | undefined;
 
 const DEFAULT_API_URL = "http://127.0.0.1:8000/api/v1";
+const REQUEST_TIMEOUT_MS = 15000;
+const MEDIA_UPLOAD_TIMEOUT_MS = 120000;
 
 export const API_URL =
   typeof process !== "undefined" && process.env?.EXPO_PUBLIC_API_URL
     ? process.env.EXPO_PUBLIC_API_URL
     : DEFAULT_API_URL;
+const API_ORIGIN = getUrlOrigin(API_URL);
 
 type BackendUser = {
   id: string;
+  username?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
@@ -56,6 +65,9 @@ type BackendProfile = BackendUser & {
   follower_count?: number;
   following_count?: number;
   post_count?: number;
+  is_private?: boolean;
+  follow_status?: "self" | "not_following" | "following" | "requested";
+  can_view_posts?: boolean;
 };
 
 type BackendPollOption = {
@@ -114,6 +126,35 @@ type BackendStory = {
   expires_at: string;
 };
 
+type BackendLiveSession = {
+  id: string;
+  host: BackendUser;
+  title?: string | null;
+  status: "live" | "ended";
+  viewer_count?: number;
+  started_at: string;
+  ended_at?: string | null;
+};
+
+type BackendActivityNotification = {
+  id: string;
+  tab: "you" | "following";
+  type: ActivityNotification["type"];
+  filter_key: ActivityNotification["filterKey"];
+  actors: BackendUser[];
+  actor_count: number;
+  title: string;
+  body?: string | null;
+  target_type: ActivityNotification["targetType"];
+  target_id?: string | null;
+  target_post?: BackendPost | null;
+  thumbnail_url?: string | null;
+  action: ActivityNotification["action"];
+  action_label?: string | null;
+  created_at: string;
+  read: boolean;
+};
+
 type BackendAIRecommendationItem = {
   category: string;
   description: string;
@@ -126,6 +167,29 @@ type BackendAIRecommendation = {
   rationale: string;
   items: BackendAIRecommendationItem[];
   preview_image_url: string;
+};
+
+type BackendSearchHashtag = {
+  tag: string;
+  post_count: number;
+  latest_post?: BackendPost | null;
+};
+
+type BackendSearchPlace = {
+  id: string;
+  name: string;
+  subtitle?: string | null;
+  post_count: number;
+  latest_post?: BackendPost | null;
+};
+
+type BackendSearchResults = {
+  query: string;
+  users: BackendUser[];
+  hashtags: BackendSearchHashtag[];
+  videos: BackendPost[];
+  places: BackendSearchPlace[];
+  top_posts: BackendPost[];
 };
 
 export class ApiError extends Error {
@@ -143,12 +207,45 @@ export class ApiError extends Error {
 export class ApiDressMeClient implements DressMeClient {
   constructor(private readonly baseUrl: string) {}
 
+  private async fetchWithTimeout(
+    path: string,
+    init?: RequestInit,
+    timeoutMs = REQUEST_TIMEOUT_MS,
+  ): Promise<Response> {
+    const url = `${this.baseUrl}${path}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new ApiError(
+          `La requete reseau a expire apres ${timeoutMs / 1000}s. Verifie que FastAPI est lance et que EXPO_PUBLIC_API_URL pointe vers le backend accessible.`,
+          undefined,
+          { path, timeoutMs },
+        );
+      }
+
+      throw new ApiError(
+        "Erreur reseau. Verifie que FastAPI est lance et que EXPO_PUBLIC_API_URL pointe vers le backend accessible.",
+        undefined,
+        error,
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   private async request<T>(
     path: string,
     init?: RequestInit,
     token?: string,
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await this.fetchWithTimeout(path, {
       ...init,
       headers: {
         "Content-Type": "application/json",
@@ -184,13 +281,13 @@ export class ApiDressMeClient implements DressMeClient {
     body: FormData,
     token: string,
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await this.fetchWithTimeout(path, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
       },
       body,
-    });
+    }, MEDIA_UPLOAD_TIMEOUT_MS);
 
     if (!response.ok) {
       let details: unknown;
@@ -259,6 +356,24 @@ export class ApiDressMeClient implements DressMeClient {
   async getMe(token: string): Promise<User> {
     const user = await this.request<BackendUser>("/auth/me", undefined, token);
     return mapUser(user);
+  }
+
+  async search(input?: { query?: string; token?: string; limit?: number }): Promise<SearchResults> {
+    const params = new URLSearchParams();
+    if (input?.query) {
+      params.set("q", input.query);
+    }
+    if (input?.limit) {
+      params.set("limit", String(input.limit));
+    }
+
+    const query = params.toString();
+    const results = await this.request<BackendSearchResults>(
+      query ? `/search?${query}` : "/search",
+      undefined,
+      input?.token,
+    );
+    return mapSearchResults(results);
   }
 
   async getFeed(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]> {
@@ -490,8 +605,106 @@ export class ApiDressMeClient implements DressMeClient {
     return posts.map(mapPost);
   }
 
-  async getProfile(userId: string): Promise<Profile> {
-    const profile = await this.request<BackendProfile>(`/users/${userId}`);
+  async getNotifications(input: { token: string; limit?: number }): Promise<ActivityNotification[]> {
+    const params = new URLSearchParams();
+    if (input.limit) {
+      params.set("limit", String(input.limit));
+    }
+
+    const query = params.toString();
+    const notifications = await this.request<BackendActivityNotification[]>(
+      query ? `/notifications/activity?${query}` : "/notifications/activity",
+      undefined,
+      input.token,
+    );
+    return notifications.map(mapActivityNotification);
+  }
+
+  async markNotificationsRead(input: { token: string; notificationIds?: string[] }): Promise<void> {
+    await this.request<{ marked: number }>(
+      "/notifications/activity/read",
+      {
+        method: "POST",
+        body: JSON.stringify({ notification_ids: input.notificationIds ?? [] }),
+      },
+      input.token,
+    );
+  }
+
+  async getLiveSessions(input: { token: string; limit?: number }): Promise<LiveSession[]> {
+    const params = new URLSearchParams();
+    if (input.limit) {
+      params.set("limit", String(input.limit));
+    }
+
+    const query = params.toString();
+    const sessions = await this.request<BackendLiveSession[]>(
+      query ? `/live/sessions?${query}` : "/live/sessions",
+      undefined,
+      input.token,
+    );
+    return sessions.map(mapLiveSession);
+  }
+
+  async createLiveSession(input: { token: string; title?: string }): Promise<LiveSession> {
+    const session = await this.request<BackendLiveSession>(
+      "/live/sessions",
+      {
+        method: "POST",
+        body: JSON.stringify({ title: input.title }),
+      },
+      input.token,
+    );
+    return mapLiveSession(session);
+  }
+
+  async endLiveSession(input: { token: string; liveId: string }): Promise<LiveSession> {
+    const session = await this.request<BackendLiveSession>(
+      `/live/sessions/${input.liveId}/end`,
+      { method: "POST" },
+      input.token,
+    );
+    return mapLiveSession(session);
+  }
+
+  async getProfile(userId: string, input?: { token?: string }): Promise<Profile> {
+    const profile = await this.request<BackendProfile>(`/users/${userId}`, undefined, input?.token);
+    return mapProfile(profile);
+  }
+
+  async getProfilePosts(input: { userId: string; token?: string; limit?: number; offset?: number }): Promise<Post[]> {
+    const params = new URLSearchParams();
+    if (input.limit) {
+      params.set("limit", String(input.limit));
+    }
+    if (input.offset) {
+      params.set("offset", String(input.offset));
+    }
+
+    const query = params.toString();
+    const posts = await this.request<BackendPost[]>(
+      query ? `/users/${input.userId}/posts?${query}` : `/users/${input.userId}/posts`,
+      undefined,
+      input.token,
+    );
+    return posts.map(mapPost);
+  }
+
+  async followUser(userId: string, token: string): Promise<Profile> {
+    const profile = await this.request<BackendProfile>(
+      `/users/${userId}/follow`,
+      { method: "POST" },
+      token,
+    );
+    return mapProfile(profile);
+  }
+
+  async unfollowUser(userId: string, token: string): Promise<Profile> {
+    const profile = await this.request<BackendProfile>(
+      `/users/${userId}/follow`,
+      { method: "DELETE" },
+      token,
+    );
     return mapProfile(profile);
   }
 
@@ -533,6 +746,7 @@ function mapAuthSession(session: BackendAuthSession): AuthSession {
 function mapUser(user: BackendUser): User {
   return {
     id: user.id,
+    username: user.username ?? undefined,
     firstName: user.first_name ?? "",
     lastName: user.last_name ?? "",
     email: user.email ?? "",
@@ -541,18 +755,72 @@ function mapUser(user: BackendUser): User {
   };
 }
 
+function mapSearchResults(results: BackendSearchResults): SearchResults {
+  return {
+    query: results.query,
+    users: results.users.map(mapUser),
+    hashtags: results.hashtags.map(mapSearchHashtag),
+    videos: results.videos.map(mapPost),
+    places: results.places.map(mapSearchPlace),
+    topPosts: results.top_posts.map(mapPost),
+  };
+}
+
+function mapSearchHashtag(hashtag: BackendSearchHashtag): SearchHashtag {
+  return {
+    tag: hashtag.tag,
+    postCount: hashtag.post_count,
+    latestPost: hashtag.latest_post ? mapPost(hashtag.latest_post) : undefined,
+  };
+}
+
+function mapSearchPlace(place: BackendSearchPlace): SearchPlace {
+  return {
+    id: place.id,
+    name: place.name,
+    subtitle: place.subtitle ?? undefined,
+    postCount: place.post_count,
+    latestPost: place.latest_post ? mapPost(place.latest_post) : undefined,
+  };
+}
+
+function mapActivityNotification(notification: BackendActivityNotification): ActivityNotification {
+  return {
+    id: notification.id,
+    tab: notification.tab,
+    type: notification.type,
+    filterKey: notification.filter_key,
+    actors: notification.actors.map(mapUser),
+    actorCount: notification.actor_count,
+    title: notification.title,
+    body: notification.body ?? undefined,
+    targetType: notification.target_type,
+    targetId: notification.target_id ?? undefined,
+    targetPost: notification.target_post ? mapPost(notification.target_post) : undefined,
+    thumbnailUrl: notification.thumbnail_url ? normalizeMediaUrl(notification.thumbnail_url) : undefined,
+    action: notification.action,
+    actionLabel: notification.action_label ?? undefined,
+    createdAt: notification.created_at,
+    read: notification.read,
+  };
+}
+
 function mapProfile(profile: BackendProfile): Profile {
+  const isPrivate = profile.is_private ?? false;
   return {
     ...mapUser(profile),
     followerCount: profile.follower_count ?? 0,
     followingCount: profile.following_count ?? 0,
     postCount: profile.post_count ?? 0,
+    isPrivate,
+    followStatus: profile.follow_status ?? "not_following",
+    canViewPosts: profile.can_view_posts ?? !isPrivate,
   };
 }
 
 function mapMediaUpload(upload: BackendMediaUpload): MediaUpload {
   return {
-    url: upload.url,
+    url: normalizeMediaUrl(upload.url),
     filename: upload.filename,
     contentType: upload.content_type,
     mediaType: upload.media_type,
@@ -567,7 +835,7 @@ function mapPost(post: BackendPost): Post {
     mediaType: post.media_type ?? "image",
     hashtags: post.hashtags,
     garmentTags: post.garment_tags,
-    imageUrls: post.image_urls,
+    imageUrls: post.image_urls.map(normalizeMediaUrl).filter(Boolean),
     likeCount: post.like_count,
     commentCount: post.comment_count,
     shareCount: post.share_count ?? 0,
@@ -582,13 +850,25 @@ function mapStory(story: BackendStory): Story {
   return {
     id: story.id,
     author: mapUser(story.author),
-    mediaUrl: story.media_url,
+    mediaUrl: normalizeMediaUrl(story.media_url),
     mediaType: story.media_type,
     caption: story.caption ?? undefined,
     viewerCount: story.viewer_count ?? 0,
     viewedByMe: story.viewed_by_me,
     createdAt: story.created_at,
     expiresAt: story.expires_at,
+  };
+}
+
+function mapLiveSession(session: BackendLiveSession): LiveSession {
+  return {
+    id: session.id,
+    host: mapUser(session.host),
+    title: session.title ?? undefined,
+    status: session.status,
+    viewerCount: session.viewer_count ?? 0,
+    startedAt: session.started_at,
+    endedAt: session.ended_at ?? undefined,
   };
 }
 
@@ -604,9 +884,56 @@ function mapPollOption(option: BackendPollOption): PollOption {
   return {
     id: option.id,
     label: option.label,
-    imageUrl: option.image_url,
+    imageUrl: normalizeMediaUrl(option.image_url),
     votes: option.votes,
   };
+}
+
+function normalizeMediaUrl(url: string): string {
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) {
+    return "";
+  }
+
+  if (trimmedUrl.startsWith("/")) {
+    return `${API_ORIGIN}${trimmedUrl}`;
+  }
+
+  try {
+    const parsedUrl = new URL(trimmedUrl);
+    const apiOrigin = new URL(API_ORIGIN);
+    const isBackendUpload = parsedUrl.pathname.startsWith("/uploads/");
+
+    if (isBackendUpload && isPrivateOrLocalHost(parsedUrl.hostname)) {
+      parsedUrl.protocol = apiOrigin.protocol;
+      parsedUrl.host = apiOrigin.host;
+      return parsedUrl.toString();
+    }
+
+    return parsedUrl.toString();
+  } catch {
+    return trimmedUrl;
+  }
+}
+
+function getUrlOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "http://127.0.0.1:8000";
+  }
+}
+
+function isPrivateOrLocalHost(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0" ||
+    hostname === "::1" ||
+    /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)
+  );
 }
 
 function mapComment(comment: BackendComment): Comment {

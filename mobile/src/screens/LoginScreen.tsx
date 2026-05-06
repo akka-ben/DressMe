@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Alert, ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Mail, LockKeyhole } from "lucide-react-native";
 
@@ -26,18 +26,18 @@ export function LoginScreen({
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("Sign in with your DressMe account.");
+  const [message, setMessage] = useState("Connectez-vous avec votre compte DressMe.");
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert("Missing fields", "Enter your email and password.");
+      Alert.alert("Champs manquants", "Entrez votre email et votre mot de passe.");
       return;
     }
 
     try {
       setLoading(true);
       await login(email, password);
-      setMessage("Login successful.");
+      setMessage("Connexion reussie.");
       onLoginSuccess?.();
     } catch (error) {
       const message =
@@ -45,8 +45,8 @@ export function LoginScreen({
           ? error.message
           : error instanceof Error
             ? error.message
-            : "Network error. Check your backend URL and connection.";
-      Alert.alert("Login failed", message);
+            : "Erreur reseau. Verifiez l'URL du backend et la connexion.";
+      Alert.alert("Connexion echouee", message);
       setMessage(message);
     } finally {
       setLoading(false);
@@ -61,8 +61,21 @@ export function LoginScreen({
       </View>
       <View style={styles.card}>
         <View style={styles.toggle}>
-          <Text style={[styles.toggleItem, styles.toggleActive]}>Connexion</Text>
-          <Text style={styles.toggleItem} onPress={() => onOpenRegister?.()}>Inscription</Text>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={4}
+            style={[styles.toggleItem, styles.toggleActive]}
+          >
+            <Text style={[styles.toggleText, styles.toggleActiveText]}>Connexion</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={4}
+            onPress={() => onOpenRegister?.()}
+            style={styles.toggleItem}
+          >
+            <Text style={styles.toggleText}>Inscription</Text>
+          </Pressable>
         </View>
         <Text style={styles.title}>Bon retour</Text>
         <Text style={styles.subtitle}>Connectez-vous pour retrouver votre feed fashion.</Text>
@@ -105,7 +118,7 @@ export function LoginScreen({
       ) : (
         <>
           <Text style={styles.meta}>
-            {user ? `Connected as ${user.firstName} ${user.lastName}` : "Not connected"}
+            {user ? `Connecte en tant que ${user.firstName} ${user.lastName}` : "Non connecte"}
           </Text>
           <Text style={styles.meta}>{message}</Text>
         </>
@@ -151,15 +164,20 @@ const styles = StyleSheet.create({
   },
   toggleItem: {
     flex: 1,
-    textAlign: "center",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 9,
     borderRadius: 10,
+  },
+  toggleActive: {
+    backgroundColor: colors.burgundy,
+  },
+  toggleText: {
     color: colors.muted,
     fontWeight: "800",
   },
-  toggleActive: {
+  toggleActiveText: {
     color: colors.white,
-    backgroundColor: colors.burgundy,
   },
   title: {
     fontFamily: fonts.display,

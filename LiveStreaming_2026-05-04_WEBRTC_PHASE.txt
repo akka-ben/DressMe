@@ -1,0 +1,71 @@
+Phase: vrai live streaming WebRTC
+Date modification: 2026-05-04
+
+Objectif:
+- Permettre un vrai test live entre deux appareils:
+  - telephone: demarre le live
+  - simulateur: voit le live en temps reel depuis le feed
+
+Backend ajoute:
+- backend/app/modules/live/router.py
+- backend/app/modules/live/service.py
+- backend/app/modules/live/__init__.py
+
+Backend modifie:
+- backend/app/api/router.py
+- backend/app/db/session.py
+- backend/app/schemas/contracts.py
+
+Logique backend:
+- Creation d'une session live MongoDB via POST /api/v1/live/sessions
+- Liste des lives actifs via GET /api/v1/live/sessions
+- Fin de live via POST /api/v1/live/sessions/{live_id}/end
+- WebSocket de signalisation via /api/v1/live/ws/{live_id}
+- Relais WebRTC offer / answer / ice_candidate entre host et viewers
+- Fin automatique de session si le host deconnecte
+- Index MongoDB ajoutes pour live_sessions
+
+Mobile ajoute:
+- mobile/src/screens/live/LiveHostScreen.tsx
+- mobile/src/screens/live/LiveViewerScreen.tsx
+- mobile/src/services/live/liveClient.ts
+
+Mobile modifie:
+- mobile/App.tsx
+- mobile/src/screens/CreatePostScreen.tsx
+- mobile/src/screens/HomeFeedScreen.tsx
+- mobile/src/services/api/apiClient.ts
+- mobile/src/services/types.ts
+- mobile/src/services/mock/mockClient.ts
+- mobile/src/types/contracts.ts
+- mobile/package.json
+- mobile/package-lock.json
+
+Logique mobile:
+- Ajout de react-native-webrtc
+- Bouton LIVE du create flow ouvre LiveHostScreen
+- LiveHostScreen capture camera + micro et cree une session live backend
+- LiveHostScreen envoie le flux via WebRTC aux viewers connectes
+- HomeFeedScreen recupere les lives actifs toutes les 5 secondes
+- HomeFeedScreen affiche une section live cliquable au-dessus des stories
+- LiveViewerScreen rejoint le live et affiche le flux remote en RTCView
+- Chat live basique viewer -> host via WebSocket
+
+Important pour tester:
+- react-native-webrtc est une dependance native.
+- Il faut recompiler l'app iOS apres cette phase:
+  cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat/mobile"
+  npx expo run:ios
+
+Test reel attendu:
+1. Lancer le backend FastAPI sur le reseau local.
+2. S'assurer que EXPO_PUBLIC_API_URL pointe vers http://IP_LOCAL:8000/api/v1 sur les deux appareils.
+3. Lancer l'app sur le telephone et le simulateur.
+4. Se connecter avec deux comptes differents.
+5. Sur le telephone: creation -> LIVE -> bouton rouge.
+6. Sur le simulateur: feed -> attendre la section live ou pull refresh -> cliquer sur le live.
+7. Le flux camera du telephone doit apparaitre sur le simulateur.
+
+Limite technique:
+- WebRTC direct fonctionne bien en reseau local.
+- Pour un usage production hors LAN/NAT difficile, il faudra ajouter un serveur TURN.

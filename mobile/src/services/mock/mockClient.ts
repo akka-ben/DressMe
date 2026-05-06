@@ -1,6 +1,6 @@
 import { mockComments, mockPosts, mockProfile, mockRecommendations } from "./mockData";
 import type { DressMeClient } from "../types";
-import type { AuthMessage, AuthSession, Comment, MediaUpload, Post, Story, User } from "../../types/contracts";
+import type { ActivityNotification, AuthMessage, AuthSession, Comment, LiveSession, MediaUpload, Post, SearchResults, Story, User } from "../../types/contracts";
 
 
 const delay = async (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,6 +25,18 @@ export class MockDressMeClient implements DressMeClient {
 
   async getMe(): Promise<User> {
     throw new Error("Mock authentication is disabled. Use ApiDressMeClient.");
+  }
+
+  async search(): Promise<SearchResults> {
+    await delay();
+    return {
+      query: "",
+      users: [],
+      hashtags: [],
+      videos: [],
+      places: [],
+      topPosts: mockPosts,
+    };
   }
 
   async getFeed() {
@@ -99,9 +111,46 @@ export class MockDressMeClient implements DressMeClient {
     return mockPosts.filter((post) => post.savedByMe);
   }
 
+  async getNotifications(): Promise<ActivityNotification[]> {
+    await delay();
+    return [];
+  }
+
+  async markNotificationsRead(): Promise<void> {
+    await delay();
+  }
+
+  async getLiveSessions(): Promise<LiveSession[]> {
+    await delay();
+    return [];
+  }
+
+  async createLiveSession(): Promise<LiveSession> {
+    throw new Error("Mock createLiveSession is disabled. Use ApiDressMeClient.");
+  }
+
+  async endLiveSession(): Promise<LiveSession> {
+    throw new Error("Mock endLiveSession is disabled. Use ApiDressMeClient.");
+  }
+
   async getProfile() {
     await delay();
     return mockProfile;
+  }
+
+  async getProfilePosts() {
+    await delay();
+    return mockPosts;
+  }
+
+  async followUser() {
+    await delay();
+    return { ...mockProfile, followStatus: mockProfile.isPrivate ? "requested" : "following" } as const;
+  }
+
+  async unfollowUser() {
+    await delay();
+    return { ...mockProfile, followStatus: "not_following" } as const;
   }
 
   async helpMeChoose() {

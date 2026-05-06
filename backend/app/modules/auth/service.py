@@ -116,6 +116,7 @@ async def register_user(db: AsyncIOMotorDatabase, payload: RegisterRequest) -> U
         + timedelta(hours=settings.email_verification_token_expire_hours),
         "avatar_url": None,
         "bio": None,
+        "is_private": False,
         "created_at": now,
         "updated_at": now,
     }

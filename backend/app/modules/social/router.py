@@ -10,6 +10,7 @@ from app.schemas.contracts import (
     CreatePostInput,
     CreateStoryInput,
     PostDTO,
+    SearchResultDTO,
     StoryDTO,
     UserDTO,
 )
@@ -47,6 +48,17 @@ async def reels(
 ) -> list[PostDTO]:
     current_user_id = str(current_user["_id"]) if current_user else None
     return await service.list_reels_posts(db, current_user_id, limit, offset)
+
+
+@router.get("/search", response_model=SearchResultDTO)
+async def search(
+    q: str = Query(default="", max_length=80),
+    limit: int = Query(default=12, ge=1, le=30),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: auth_service.UserDocument | None = Depends(optional_current_user),
+) -> SearchResultDTO:
+    current_user_id = str(current_user["_id"]) if current_user else None
+    return await service.search_explore(db, q, current_user_id, limit)
 
 
 @router.post("/posts", response_model=PostDTO, status_code=status.HTTP_201_CREATED)

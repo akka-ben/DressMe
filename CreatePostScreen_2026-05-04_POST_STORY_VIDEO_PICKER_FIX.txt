@@ -1,0 +1,22 @@
+Screen: CreatePostScreen
+Date modification: 2026-05-04
+
+Probleme corrige:
+- En mode POST et STORY, la galerie n'autorisait que les images.
+- Une video choisie en mode POST etait publiee correctement en media_type video, mais l'app la traitait ensuite comme un reel pour la navigation.
+
+Fichiers modifies:
+- mobile/src/screens/CreatePostScreen.tsx
+
+Logique implementee:
+- Le picker galerie accepte maintenant images + videos pour POST.
+- Le picker galerie accepte maintenant images + videos pour STORY.
+- Le picker galerie reste limite aux videos pour REEL.
+- Une video publiee depuis le mode POST reste une publication de feed apres creation.
+- Une video publiee depuis le mode STORY reste une story video.
+- Les messages d'aide camera ont ete ajustes pour indiquer photo/video depuis la galerie.
+
+Comportement attendu:
+- POST: choisir une image ou une video depuis la galerie, puis publier dans le feed.
+- STORY: choisir une image ou une video depuis la galerie, puis publier dans les stories.
+- REEL: choisir/enregistrer une video, puis publier dans Reels.

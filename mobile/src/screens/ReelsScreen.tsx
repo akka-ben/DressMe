@@ -17,11 +17,11 @@ import {
   Bookmark,
   Heart,
   MessageCircle,
-  PlayCircle,
   Share2,
   Video,
 } from "lucide-react-native";
 
+import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
@@ -276,17 +276,26 @@ function ReelCard({
 }) {
   const author = toDisplayUser(post.author);
   const mediaUrl = post.imageUrls[0];
-  const canPreviewImage = Boolean(mediaUrl && !isVideoUrl(mediaUrl));
+  const isVideo = post.mediaType === "video" || isVideoUrl(mediaUrl);
 
   return (
     <View style={[styles.reel, { height }]}>
       <View style={styles.mediaFrame}>
-        {canPreviewImage ? (
+        {mediaUrl && isVideo ? (
+          <DressMeVideoPlayer
+            uri={mediaUrl}
+            style={styles.mediaImage}
+            autoPlay
+            loop
+            nativeControls={false}
+            contentFit="cover"
+          />
+        ) : mediaUrl ? (
           <Image source={{ uri: mediaUrl }} style={styles.mediaImage} />
         ) : (
           <View style={styles.videoFallback}>
-            <PlayCircle size={72} color={colors.white} />
-            <Text style={styles.videoFallbackText}>Reel video</Text>
+            <Video size={72} color={colors.white} />
+            <Text style={styles.videoFallbackText}>Media indisponible</Text>
           </View>
         )}
         <View style={styles.mediaOverlay} />

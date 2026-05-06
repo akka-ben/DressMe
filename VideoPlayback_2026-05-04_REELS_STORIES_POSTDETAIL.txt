@@ -1,0 +1,34 @@
+Phase: lecture video reelle dans DressMe
+Date modification: 2026-05-04
+
+Probleme corrige:
+- Les reels et videos uploadees etaient bien crees cote backend/MongoDB, mais le frontend affichait encore un placeholder noir avec une icone play au lieu de lire la video.
+
+Fichiers modifies:
+- mobile/app.json
+- mobile/package.json
+- mobile/package-lock.json
+- mobile/src/components/DressMeVideoPlayer.tsx
+- mobile/src/screens/PostDetailScreen.tsx
+- mobile/src/screens/ReelsScreen.tsx
+- mobile/src/screens/HomeFeedScreen.tsx
+- mobile/src/screens/CreatePostScreen.tsx
+
+Logique implementee:
+- Ajout de la dependance native expo-video pour lire les fichiers video dans Expo/iOS.
+- Creation du composant reutilisable DressMeVideoPlayer base sur VideoView et useVideoPlayer.
+- Correction du crash iOS dans le feed Reels: suppression du pause() appele au cleanup apres liberation de l'objet natif Expo.
+- Remplacement de allowsFullscreen par fullscreenOptions pour supprimer le warning de depreciation expo-video.
+- Lecture video reelle dans PostDetailScreen pour les posts/reels avec mediaType video.
+- Lecture video reelle dans ReelsScreen avec autoplay, loop et rendu plein ecran.
+- Lecture video reelle dans HomeFeedScreen pour les posts video du feed.
+- Lecture video reelle dans StoryViewer pour les stories video.
+- Preview video reelle dans CreatePostScreen quand une video est choisie depuis la galerie ou capturee avec la camera.
+- Conservation de l'affichage image classique pour les medias image.
+
+Important pour tester:
+- Comme expo-video est un module natif, il faut recompiler l'app iOS une fois avec:
+  cd "/Users/mohammedbenakkaouayad/Desktop/MASTER_WISD/S2/Web Mobile/DressMe_Chat/mobile"
+  npx expo run:ios
+
+- Apres cette recompilation, les prochains changements JS peuvent etre testes avec un simple refresh Expo.

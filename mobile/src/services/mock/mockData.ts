@@ -14,6 +14,9 @@ export const mockProfile: Profile = {
   followerCount: 241,
   followingCount: 132,
   postCount: 29,
+  isPrivate: false,
+  followStatus: "not_following",
+  canViewPosts: true,
 };
 
 export const mockPosts: Post[] = [

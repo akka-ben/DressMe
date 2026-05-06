@@ -1,0 +1,24 @@
+Screen: CreatePostScreen
+Date modification: 2026-05-04
+
+Probleme corrige:
+- Le mode LIVE etait un placeholder: appuyer sur le bouton affichait seulement une alerte.
+- Le live n'avait pas de timer, pas d'etat visuel, pas de spectateurs et pas de flux d'activite.
+
+Fichiers modifies:
+- mobile/src/screens/CreatePostScreen.tsx
+
+Logique implementee:
+- Le mode LIVE utilise maintenant la camera en mode video.
+- Le micro est demande aussi pour LIVE, pas seulement pour REEL.
+- Appuyer sur le bouton rouge demarre une session live locale.
+- Appuyer a nouveau termine le live.
+- Ajout d'un badge EN DIRECT.
+- Ajout d'un timer live fonctionnel.
+- Ajout d'un compteur de spectateurs progressif.
+- Ajout de commentaires live simules dans l'interface.
+- Fermeture ou changement de mode arrete le live proprement.
+
+Limite technique actuelle:
+- Le live est fonctionnel cote interface/camera mobile.
+- Le vrai streaming multi-utilisateur necessite une phase backend dediee avec WebRTC ou RTMP + signalisation temps reel.

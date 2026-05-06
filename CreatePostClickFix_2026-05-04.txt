@@ -1,0 +1,33 @@
+Correction: CreatePostClickFix_2026-05-04
+
+Probleme observe:
+- L'application compile et se lance.
+- Le bouton de creation de post semble ne pas reagir.
+- Les logs iOS affiches sont principalement des warnings simulateur CoreHaptics/TextInput/VideoToolbox, pas une erreur de build.
+
+Corrections realisees:
+
+1) HomeFeedScreen.tsx
+- Ajout d'une zone tactile plus grande sur le bouton + du header.
+- Ajout d'accessibilityRole/accessibilityLabel pour le bouton de creation.
+- Augmentation de zIndex/elevation sur headerBlock/headerActions/iconButton.
+- Objectif: eviter que les overlays comme "Logout · Mohammed" ou les couches du header interceptent le tap.
+
+2) CreatePostScreen.tsx
+- Le bouton Publier n'est plus desactive silencieusement quand une condition manque.
+- publishPost arrete seulement si une publication est deja en cours.
+- Si la session/token manque, l'utilisateur voit une alerte "Session requise".
+- Si aucun media n'est selectionne, l'utilisateur voit une alerte "Media requis".
+- Objectif: ne plus donner l'impression qu'un bouton est mort.
+
+Verification:
+- npm run typecheck: OK
+
+Action recommandee pour tester:
+- Relancer Metro avec cache vide apres les changements natifs/Babel:
+  cd mobile
+  npx expo start --dev-client --clear
+- Ouvrir l'app sur le simulateur.
+- Sur Feed, cliquer sur le bouton + dans le header.
+- Choisir POST puis galerie/camera.
+- Selectionner une image/video, ajouter une legende, puis Publier.

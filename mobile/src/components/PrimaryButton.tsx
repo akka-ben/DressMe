@@ -22,7 +22,10 @@ export function PrimaryButton({
 }: Props) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
       disabled={disabled}
+      hitSlop={6}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import Constants from "expo-constants";
+import React, { Suspense, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Linking,
-  Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -27,11 +28,24 @@ import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { MessagesScreen } from "./src/screens/MessagesScreen";
 import { colors, fonts } from "./src/theme/dressme";
+import type { LiveSession } from "./src/types/contracts";
 
 const splashGif = require("./assets/dressme-splash.gif");
-const AUTHENTICATED_TOP_SPACE = Platform.OS === "ios" ? 58 : StatusBar.currentHeight ?? 0;
+const IS_EXPO_GO = Constants.appOwnership === "expo";
+const APP_TOP_INSET = Math.max(Constants.statusBarHeight ?? 0, 0);
+const LazyLiveHostScreen = React.lazy(() =>
+  import("./src/screens/live/LiveHostScreen").then((module) => ({
+    default: module.LiveHostScreen,
+  })),
+);
+const LazyLiveViewerScreen = React.lazy(() =>
+  import("./src/screens/live/LiveViewerScreen").then((module) => ({
+    default: module.LiveViewerScreen,
+  })),
+);
 
 type AuthRoute = "onboarding" | "login" | "register" | "forgot" | "reset";
+type LiveRoute = { role: "host" } | { role: "viewer"; session: LiveSession };
 
 export default function App() {
   return (
@@ -50,6 +64,7 @@ function AppShell() {
   const [showSplash, setShowSplash] = useState(true);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [liveRoute, setLiveRoute] = useState<LiveRoute | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 3500);
@@ -114,10 +129,44 @@ function AppShell() {
   };
 
   const renderTab = () => {
+    if (liveRoute?.role === "host") {
+      if (IS_EXPO_GO) {
+        return <LiveUnavailableScreen onClose={() => setLiveRoute(null)} />;
+      }
+
+      return (
+        <Suspense fallback={<LiveLoadingState />}>
+          <LazyLiveHostScreen
+            onClose={() => {
+              setLiveRoute(null);
+              setActiveTab("feed");
+            }}
+          />
+        </Suspense>
+      );
+    }
+
+    if (liveRoute?.role === "viewer") {
+      if (IS_EXPO_GO) {
+        return <LiveUnavailableScreen onClose={() => setLiveRoute(null)} />;
+      }
+
+      return (
+        <Suspense fallback={<LiveLoadingState />}>
+          <LazyLiveViewerScreen liveSession={liveRoute.session} onClose={() => setLiveRoute(null)} />
+        </Suspense>
+      );
+    }
+
     if (showCreatePost) {
       return (
         <CreatePostScreen
           onClose={() => setShowCreatePost(false)}
+          onOpenLive={() => {
+            setShowCreatePost(false);
+            setSelectedPostId(null);
+            setLiveRoute({ role: "host" });
+          }}
           onCreated={(createdType) => {
             setShowCreatePost(false);
             setSelectedPostId(null);
@@ -136,6 +185,11 @@ function AppShell() {
         return (
           <HomeFeedScreen
             onOpenPost={setSelectedPostId}
+            onOpenLive={(session) => {
+              setSelectedPostId(null);
+              setShowCreatePost(false);
+              setLiveRoute({ role: "viewer", session });
+            }}
             onOpenCreate={() => {
               setSelectedPostId(null);
               setShowCreatePost(true);
@@ -143,7 +197,7 @@ function AppShell() {
           />
         );
       case "search":
-        return <SearchScreen />;
+        return <SearchScreen onOpenPost={setSelectedPostId} />;
       case "reels":
         return <ReelsScreen onOpenPost={setSelectedPostId} />;
       case "messages":
@@ -171,10 +225,17 @@ function AppShell() {
             </View>
           ) : (
             <>
-              {isAuthenticated && !showCreatePost ? (
-                <Text style={styles.logout} onPress={() => void logout()}>
-                  Logout{user?.firstName ? ` · ${user.firstName}` : ""}
-                </Text>
+              {isAuthenticated && !showCreatePost && !liveRoute ? (
+                <Pressable
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => void logout()}
+                  style={styles.logout}
+                >
+                  <Text style={styles.logoutText}>
+                    Logout{user?.firstName ? ` · ${user.firstName}` : ""}
+                  </Text>
+                </Pressable>
               ) : null}
 
               {isLoading ? (
@@ -189,13 +250,15 @@ function AppShell() {
                 <ScrollView
                   style={styles.screen}
                   contentContainerStyle={styles.screenContent}
+                  keyboardDismissMode="on-drag"
+                  keyboardShouldPersistTaps="always"
                   showsVerticalScrollIndicator={false}
                 >
                   {renderAuth()}
                 </ScrollView>
               )}
 
-              {isAuthenticated && authRoute !== "reset" && !showCreatePost ? (
+              {isAuthenticated && authRoute !== "reset" && !showCreatePost && !liveRoute ? (
                 <TabBar activeTab={activeTab} onChange={changeTab} />
               ) : null}
             </>
@@ -217,6 +280,30 @@ function extractResetToken(url: string | null): string | null {
   }
 
   return decodeURIComponent(match[1].replace(/\+/g, "%20"));
+}
+
+function LiveLoadingState() {
+  return (
+    <View style={[styles.screen, styles.loadingState]}>
+      <ActivityIndicator color={colors.burgundy} />
+      <Text style={styles.loadingText}>Chargement du live...</Text>
+    </View>
+  );
+}
+
+function LiveUnavailableScreen({ onClose }: { onClose: () => void }) {
+  return (
+    <View style={styles.liveUnavailable}>
+      <Text style={styles.liveUnavailableTitle}>Live indisponible dans Expo Go</Text>
+      <Text style={styles.liveUnavailableText}>
+        Le streaming utilise WebRTC natif. Expo Go peut tester le feed, search, posts, reels et
+        l'UI, mais pas le live video natif.
+      </Text>
+      <Pressable accessibilityRole="button" onPress={onClose} style={styles.liveUnavailableButton}>
+        <Text style={styles.liveUnavailableButtonText}>Retour au feed</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -268,32 +355,72 @@ const styles = StyleSheet.create({
     minHeight: 0,
     backgroundColor: colors.cream,
     overflow: "hidden",
-    paddingTop: AUTHENTICATED_TOP_SPACE,
+    paddingTop: APP_TOP_INSET,
     paddingBottom: 76,
   },
   screenContent: {
     flexGrow: 1,
     padding: 12,
-    paddingTop: 18,
+    paddingTop: APP_TOP_INSET + 18,
     paddingBottom: 20,
   },
   logout: {
     position: "absolute",
-    top: AUTHENTICATED_TOP_SPACE + 10,
+    top: APP_TOP_INSET + 10,
     right: 18,
     zIndex: 12,
-    color: colors.burgundy,
-    fontSize: 11,
-    fontWeight: "800",
     backgroundColor: "rgba(255,255,255,0.88)",
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    overflow: "hidden",
+  },
+  logoutText: {
+    color: colors.burgundy,
+    fontSize: 11,
+    fontWeight: "800",
   },
   loadingState: {
     minHeight: 160,
     alignItems: "center",
     justifyContent: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    color: colors.muted,
+    fontWeight: "700",
+  },
+  liveUnavailable: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 14,
+    backgroundColor: colors.cream,
+  },
+  liveUnavailableTitle: {
+    color: colors.text,
+    fontFamily: fonts.display,
+    fontSize: 28,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  liveUnavailableText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  liveUnavailableButton: {
+    minHeight: 46,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    backgroundColor: colors.burgundy,
+  },
+  liveUnavailableButtonText: {
+    color: colors.white,
+    fontWeight: "900",
   },
 });

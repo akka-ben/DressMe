@@ -20,11 +20,11 @@ import {
   Heart,
   MessageCircle,
   MoreHorizontal,
-  PlayCircle,
   Send,
   Share2,
 } from "lucide-react-native";
 
+import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
@@ -312,13 +312,15 @@ function PostDetailHeader({
 
       {isVideo ? (
         <View style={styles.videoFrame}>
-          {mediaUrl && !isVideoUrl(mediaUrl) ? (
-            <Image source={{ uri: mediaUrl }} style={styles.postImage} />
+          {mediaUrl ? (
+            <DressMeVideoPlayer
+              uri={mediaUrl}
+              style={styles.postVideo}
+              autoPlay
+              nativeControls
+              contentFit="contain"
+            />
           ) : null}
-          <View style={styles.videoOverlay}>
-            <PlayCircle size={58} color={colors.white} />
-            <Text style={styles.videoText}>Video / Reel</Text>
-          </View>
         </View>
       ) : (
         <Image source={{ uri: mediaUrl }} style={styles.postImage} />
@@ -601,20 +603,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  videoOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.28)",
-    gap: 8,
-  },
-  videoText: {
-    color: colors.white,
-    fontWeight: "900",
+  postVideo: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: colors.black,
   },
   actionRow: {
     flexDirection: "row",

@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
@@ -14,6 +16,9 @@ from app.schemas.contracts import (
     PollDTO,
     PollOptionDTO,
     PostDTO,
+    SearchHashtagDTO,
+    SearchPlaceDTO,
+    SearchResultDTO,
     StoryDTO,
     UserDTO,
 )
@@ -35,8 +40,20 @@ def normalize_hashtag(tag: str) -> str:
     return value if value.startswith("#") else f"#{value}"
 
 
+def normalize_search_text(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(character for character in text if not unicodedata.combining(character))
+
+
+def search_regex(query: str) -> dict[str, str]:
+    return {"$regex": re.escape(query.strip()), "$options": "i"}
+
+
 def normalize_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
         return value
 
     if isinstance(value, str):
@@ -161,12 +178,86 @@ def user_to_dto(user: UserDocument | None, fallback_id: str) -> UserDTO:
 
     return UserDTO(
         id=str(user.get("id") or user.get("_id") or fallback_id),
+        username=user.get("username"),
         first_name=user.get("first_name"),
         last_name=user.get("last_name"),
         email=user.get("email"),
         avatar_url=user.get("avatar_url"),
         bio=user.get("bio"),
     )
+
+
+def post_search_text(post: PostDocument) -> str:
+    searchable_parts: list[str] = [
+        str(post.get("caption") or post.get("description") or ""),
+        " ".join(normalize_string_list(post.get("hashtags"), hashtags=True)),
+        " ".join(normalize_string_list(post.get("garment_tags") or post.get("tags"))),
+    ]
+
+    for field_name in ("location", "place", "city", "venue", "country"):
+        value = post.get(field_name)
+        if isinstance(value, dict):
+            searchable_parts.extend(str(item) for item in value.values())
+        elif isinstance(value, list):
+            searchable_parts.extend(str(item) for item in value)
+        elif value:
+            searchable_parts.append(str(value))
+
+    return normalize_search_text(" ".join(searchable_parts))
+
+
+def post_matches_query(post: PostDocument, normalized_query: str) -> bool:
+    if not normalized_query:
+        return True
+    return normalized_query in post_search_text(post)
+
+
+KNOWN_PLACE_TERMS = {
+    "casablanca": "Casablanca",
+    "rabat": "Rabat",
+    "marrakech": "Marrakech",
+    "marakech": "Marrakech",
+    "fes": "Fes",
+    "fès": "Fes",
+    "tanger": "Tanger",
+    "agadir": "Agadir",
+    "paris": "Paris",
+}
+
+
+def iter_post_places(post: PostDocument) -> list[str]:
+    places: list[str] = []
+
+    for field_name in ("location", "place", "city", "venue"):
+        value = post.get(field_name)
+        raw_values = value if isinstance(value, list) else [value] if value else []
+        for raw_value in raw_values:
+            if isinstance(raw_value, dict):
+                preferred = raw_value.get("name") or raw_value.get("city") or raw_value.get("label")
+                if preferred:
+                    places.append(str(preferred))
+            elif raw_value:
+                places.append(str(raw_value))
+
+    text = post_search_text(post)
+    for key, label in KNOWN_PLACE_TERMS.items():
+        if key in text:
+            places.append(label)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for place in places:
+        label = place.strip()
+        normalized = normalize_search_text(label)
+        if label and normalized not in seen:
+            deduped.append(label)
+            seen.add(normalized)
+    return deduped
+
+
+def search_place_id(name: str) -> str:
+    normalized = normalize_search_text(name)
+    return re.sub(r"[^a-z0-9]+", "-", normalized).strip("-") or "place"
 
 
 async def post_to_dto(
@@ -299,6 +390,151 @@ async def list_reels_posts(
     reels = [post for post in documents if detect_media_type(post) == "video"]
     page = reels[offset : offset + limit]
     return [await post_to_dto(db, post, current_user_id) for post in page]
+
+
+async def search_explore(
+    db: AsyncIOMotorDatabase,
+    query: str,
+    current_user_id: str | None,
+    limit: int,
+) -> SearchResultDTO:
+    clean_query = query.strip()
+    normalized_query = normalize_search_text(clean_query.lstrip("@#"))
+    if not normalized_query:
+        return SearchResultDTO(query=clean_query)
+
+    regex = search_regex(clean_query.lstrip("@#") or clean_query) if clean_query else None
+    candidate_limit = max(limit * 6, 60)
+
+    if regex:
+        user_query: dict[str, Any] = {
+            "$or": [
+                {"username": regex},
+                {"first_name": regex},
+                {"last_name": regex},
+                {"bio": regex},
+                {"email": regex},
+            ]
+        }
+        post_query: dict[str, Any] = {
+            "$or": [
+                {"caption": regex},
+                {"description": regex},
+                {"hashtags": regex},
+                {"garment_tags": regex},
+                {"tags": regex},
+                {"location": regex},
+                {"place": regex},
+                {"city": regex},
+                {"venue": regex},
+            ]
+        }
+    else:
+        user_query = {}
+        post_query = {}
+
+    users = await (
+        db.users.find(user_query)
+        .sort([("followers_count", -1), ("created_at", -1)])
+        .limit(limit)
+        .to_list(length=limit)
+    )
+
+    post_candidates = await (
+        db.posts.find(post_query)
+        .sort("created_at", -1)
+        .limit(candidate_limit)
+        .to_list(length=candidate_limit)
+    )
+
+    if regex and len(post_candidates) < limit:
+        fallback_posts = await (
+            db.posts.find({})
+            .sort("created_at", -1)
+            .limit(candidate_limit)
+            .to_list(length=candidate_limit)
+        )
+        known_ids = {str(post.get("_id")) for post in post_candidates}
+        post_candidates.extend(
+            post for post in fallback_posts if str(post.get("_id")) not in known_ids
+        )
+
+    matching_posts = [
+        post for post in post_candidates if post_matches_query(post, normalized_query)
+    ]
+    top_post_docs = matching_posts[:limit]
+    video_docs = [
+        post for post in matching_posts if detect_media_type(post) == "video"
+    ][:limit]
+
+    hashtag_posts = await (
+        db.posts.find({})
+        .sort("created_at", -1)
+        .limit(300)
+        .to_list(length=300)
+    )
+    hashtag_buckets: dict[str, dict[str, Any]] = {}
+    place_buckets: dict[str, dict[str, Any]] = {}
+
+    for post in hashtag_posts:
+        for tag in normalize_string_list(post.get("hashtags"), hashtags=True):
+            if normalized_query and normalized_query not in normalize_search_text(tag):
+                continue
+            bucket = hashtag_buckets.setdefault(
+                tag,
+                {"tag": tag, "post_count": 0, "latest_post": post},
+            )
+            bucket["post_count"] += 1
+
+        for place in iter_post_places(post):
+            if normalized_query and normalized_query not in normalize_search_text(place):
+                continue
+            place_id = search_place_id(place)
+            bucket = place_buckets.setdefault(
+                place_id,
+                {
+                    "id": place_id,
+                    "name": place,
+                    "subtitle": "Lieu detecte depuis les publications DressMe",
+                    "post_count": 0,
+                    "latest_post": post,
+                },
+            )
+            bucket["post_count"] += 1
+
+    hashtag_items = sorted(
+        hashtag_buckets.values(),
+        key=lambda item: (-int(item["post_count"]), str(item["tag"])),
+    )[:limit]
+    place_items = sorted(
+        place_buckets.values(),
+        key=lambda item: (-int(item["post_count"]), str(item["name"])),
+    )[:limit]
+
+    return SearchResultDTO(
+        query=clean_query,
+        users=[user_to_dto(user, str(user.get("_id"))) for user in users],
+        hashtags=[
+            SearchHashtagDTO(
+                tag=str(item["tag"]),
+                post_count=int(item["post_count"]),
+                latest_post=await post_to_dto(db, item["latest_post"], current_user_id),
+            )
+            for item in hashtag_items
+        ],
+        videos=[await post_to_dto(db, post, current_user_id) for post in video_docs],
+        places=[
+            SearchPlaceDTO(
+                id=str(item["id"]),
+                name=str(item["name"]),
+                subtitle=str(item["subtitle"]),
+                post_count=int(item["post_count"]),
+                latest_post=await post_to_dto(db, item["latest_post"], current_user_id),
+            )
+            for item in place_items
+        ],
+        top_posts=[await post_to_dto(db, post, current_user_id) for post in top_post_docs],
+    )
 
 
 async def create_post(
@@ -507,10 +743,27 @@ async def toggle_like(
             {"_id": post_id},
             {"$pull": {"like_user_ids": user_id}, "$set": {"updated_at": utc_now()}},
         )
+        await db.post_likes.delete_one({"_id": f"{user_id}:{post_id}"})
     else:
+        now = utc_now()
         await db.posts.update_one(
             {"_id": post_id},
-            {"$addToSet": {"like_user_ids": user_id}, "$set": {"updated_at": utc_now()}},
+            {"$addToSet": {"like_user_ids": user_id}, "$set": {"updated_at": now}},
+        )
+        await db.post_likes.update_one(
+            {"_id": f"{user_id}:{post_id}"},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "post_id": post_id,
+                    "updated_at": now,
+                },
+                "$setOnInsert": {
+                    "id": f"{user_id}:{post_id}",
+                    "created_at": now,
+                },
+            },
+            upsert=True,
         )
 
     updated = await db.posts.find_one({"_id": post_id})
