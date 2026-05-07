@@ -56,6 +56,7 @@ type BackendProfile = BackendUser & {
   follower_count?: number;
   following_count?: number;
   post_count?: number;
+  last_seen?: string | null;
 };
 
 type BackendPollOption = {
@@ -302,6 +303,20 @@ async unfollowUser(userId: string, token: string): Promise<{ following: boolean 
   );
 }
 
+async changePassword(currentPassword: string, newPassword: string, token: string): Promise<{ message: string }> {
+  return this.request<{ message: string }>(
+    "/auth/change-password",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    },
+    token
+  );
+}
+
 async getUserPosts(userId: string, token?: string): Promise<Post[]> {
   const posts = await this.request<BackendPost[]>(
     `/users/${userId}/posts`,
@@ -441,6 +456,9 @@ async getFollowing(userId: string, token?: string): Promise<User[]> {
     return users.map(mapUser);
   }
 
+  async pingOnline(token: string): Promise<void> {
+    await this.request<{ status: string }>("/users/me/ping", undefined, token);
+}
   async getPost(postId: string, input?: { token?: string }): Promise<Post> {
     const post = await this.request<BackendPost>(
       `/posts/${postId}`,
@@ -615,6 +633,7 @@ function mapProfile(profile: BackendProfile): Profile {
     followerCount: profile.follower_count ?? 0,
     followingCount: profile.following_count ?? 0,
     postCount: profile.post_count ?? 0,
+    lastSeen: profile.last_seen ?? undefined,
   };
 }
 

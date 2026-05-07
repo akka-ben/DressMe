@@ -137,4 +137,13 @@ async getFollowing(): Promise<User[]> {
   await delay();
   return [];
 }
+
+async changePassword(): Promise<{ message: string }> {
+  throw new Error("Mock changePassword is disabled. Use ApiDressMeClient.");
+}
+
+async pingOnline(): Promise<void> {
+  return;
+}
+
 }

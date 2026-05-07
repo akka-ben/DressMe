@@ -11,18 +11,20 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { ArrowLeft, Camera, CheckCircle2 } from "lucide-react-native";
+import { ArrowLeft, Camera, CheckCircle2, ChevronRight, Lock } from "lucide-react-native";
 
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
 
+
 type Props = {
   onBack?: () => void;
   onSaved?: () => void;
+  onChangePassword?: () => void;
 };
 
-export function EditProfileScreen({ onBack, onSaved }: Props) {
+export function EditProfileScreen({ onBack, onSaved, onChangePassword }: Props) {
   const { user, token, updateUser } = useAuth();
 
   const [firstName, setFirstName] = useState(user?.firstName ?? "");
@@ -37,38 +39,65 @@ export function EditProfileScreen({ onBack, onSaved }: Props) {
     bio       !== (user?.bio ?? "")       ||
     avatarUrl !== (user?.avatarUrl ?? "");
 
-const pickImage = async () => {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) {
-    Alert.alert("Permission refusée", "Autorisez l'accès à la galerie dans les paramètres.");
-    return;
-  }
-
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.8,
-  });
-
-  if (result.canceled || !result.assets[0]) return;
-
-  if (!token) return;
-
-  const asset = result.assets[0];
-  const fileName = asset.uri.split("/").pop() ?? "avatar.jpg";
-  const fileType = asset.mimeType ?? "image/jpeg";
-
-  try {
-    const uploaded = await client.uploadMedia(
-      { uri: asset.uri, name: fileName, type: fileType },
-      token
+  const pickImage = async () => {
+    Alert.alert(
+      "Photo de profil",
+      "Choisissez une source",
+      [
+        {
+          text: "Galerie",
+          onPress: async () => {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert("Permission refusée", "Autorisez l'accès à la galerie dans les paramètres.");
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            await uploadAsset(result.assets[0]);
+          },
+        },
+        {
+          text: "Caméra",
+          onPress: async () => {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert("Permission refusée", "Autorisez l'accès à la caméra dans les paramètres.");
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (result.canceled || !result.assets[0]) return;
+            await uploadAsset(result.assets[0]);
+          },
+        },
+        { text: "Annuler", style: "cancel" },
+      ]
     );
-    setAvatarUrl(uploaded.url);
-  } catch (e) {
-    Alert.alert("Erreur", "Impossible d'uploader la photo.");
-  }
-};
+  };
+
+  const uploadAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!token) return;
+    const fileName = asset.uri.split("/").pop() ?? "avatar.jpg";
+    const fileType = asset.mimeType ?? "image/jpeg";
+    try {
+      const uploaded = await client.uploadMedia(
+        { uri: asset.uri, name: fileName, type: fileType },
+        token
+      );
+      setAvatarUrl(uploaded.url);
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible d'uploader la photo.");
+    }
+  };
 
   const handleSave = async () => {
     if (!token || !user?.id) return;
@@ -174,6 +203,13 @@ const pickImage = async () => {
           Email : {user?.email ?? "—"} (non modifiable)
         </Text>
       </View>
+
+      {/* Bouton Changer le mot de passe */}
+      <Pressable style={styles.changePassBtn} onPress={onChangePassword}>
+        <Lock size={16} color={colors.burgundy} />
+        <Text style={styles.changePassText}>Changer le mot de passe</Text>
+        <ChevronRight size={16} color={colors.muted} />
+      </Pressable>
 
       {/* Bouton sauvegarder */}
       <Pressable
@@ -355,6 +391,23 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 12,
     color: colors.muted,
+  },
+  changePassBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow.card,
+  },
+  changePassText: {
+    flex: 1,
+    color: colors.text,
+    fontWeight: "700",
+    fontSize: 14,
   },
   saveBtn: {
     backgroundColor: colors.burgundy,

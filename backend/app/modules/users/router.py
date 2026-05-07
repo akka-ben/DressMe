@@ -204,3 +204,16 @@ async def get_following(
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> list[UserDTO]:
     follow_docs = await db
+
+
+# GET /users/me/ping — mettre à jour last_seen
+@router.get("/me/ping")
+async def ping(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
+) -> dict[str, str]:
+    await db.users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"last_seen": utc_now()}}
+    )
+    return {"status": "ok"}

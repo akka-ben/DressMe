@@ -71,4 +71,6 @@ export interface DressMeClient {
   getUserPosts(userId: string, token?: string): Promise<Post[]>;
   getFollowing(userId: string, token?: string): Promise<User[]>;
   getUserFollowers(userId: string, token?: string): Promise<User[]>;
+  changePassword(currentPassword: string, newPassword: string, token: string): Promise<{ message: string }>;
+  pingOnline(token: string): Promise<void>;
 }

@@ -333,3 +333,19 @@ async def get_current_user(
     if not user:
         raise auth_error
     return user
+
+async def change_password(
+    db: AsyncIOMotorDatabase,
+    current_user: UserDocument,
+    current_password: str,
+    new_password: str,
+) -> None:
+    if not verify_password(current_password, current_user.get("password_hash")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mot de passe actuel incorrect",
+        )
+    await db.users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"password_hash": hash_password(new_password), "updated_at": utc_now()}},
+    )

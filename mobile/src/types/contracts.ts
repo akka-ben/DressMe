@@ -11,6 +11,7 @@ export type Profile = User & {
   followerCount: number;
   followingCount: number;
   postCount: number;
+  lastSeen?: string;
 };
 
 export type PollOption = {

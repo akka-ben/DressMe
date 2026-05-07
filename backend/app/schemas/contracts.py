@@ -17,6 +17,7 @@ class ProfileDTO(UserDTO):
     follower_count: int = 0
     following_count: int = 0
     post_count: int = 0
+    last_seen: datetime | None = None
 
 
 class CommentDTO(BaseModel):

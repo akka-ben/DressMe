@@ -30,6 +30,8 @@ import { colors, fonts } from "./src/theme/dressme";
 import { EditProfileScreen } from "./src/screens/EditProfileScreen";
 import { UserProfileScreen } from "./src/screens/UserProfileScreen";
 import { FollowersScreen } from "./src/screens/FollowersScreen";
+import { ChangePasswordScreen } from "./src/screens/ChangePasswordScreen";
+import { client } from "./src/services";
 
 const splashGif = require("./assets/dressme-splash.gif");
 const AUTHENTICATED_TOP_SPACE = Platform.OS === "ios" ? 58 : StatusBar.currentHeight ?? 0;
@@ -45,7 +47,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated, isLoading, logout, user } = useAuth();
+  const { isAuthenticated, isLoading, logout, user, token } = useAuth();
   const [authRoute, setAuthRoute] = useState<AuthRoute>("onboarding");
   const [activeTab, setActiveTab] = useState<AppTab>("feed");
   const [lastRegisteredEmail, setLastRegisteredEmail] = useState("");
@@ -54,6 +56,7 @@ function AppShell() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [followersState, setFollowersState] = useState<{
     userId: string;
@@ -77,6 +80,16 @@ function AppShell() {
     const subscription = Linking.addEventListener("url", ({ url }) => handleUrl(url));
     return () => subscription.remove();
   }, []);
+
+  // Ping online toutes les 2 minutes
+  useEffect(() => {
+    if (!token) return;
+    void client.pingOnline(token);
+    const interval = setInterval(() => {
+      void client.pingOnline(token);
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   const renderAuth = () => {
     switch (authRoute) {
@@ -164,6 +177,13 @@ function AppShell() {
         return <MessagesScreen />;
 
       case "profile":
+        if (showChangePassword) {
+          return (
+            <ChangePasswordScreen
+              onBack={() => setShowChangePassword(false)}
+            />
+          );
+        }
         if (followersState) {
           return (
             <FollowersScreen
@@ -182,6 +202,10 @@ function AppShell() {
             <EditProfileScreen
               onBack={() => setShowEditProfile(false)}
               onSaved={() => setShowEditProfile(false)}
+              onChangePassword={() => {
+                setShowEditProfile(false);
+                setShowChangePassword(true);
+              }}
             />
           );
         }
@@ -200,6 +224,7 @@ function AppShell() {
     setSelectedPostId(null);
     setShowCreatePost(false);
     setShowEditProfile(false);
+    setShowChangePassword(false);
     setViewingUserId(null);
     setFollowersState(null);
     setActiveTab(tab);
