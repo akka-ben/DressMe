@@ -15,6 +15,7 @@ export type Profile = User & {
   isPrivate: boolean;
   followStatus: "self" | "not_following" | "following" | "requested";
   canViewPosts: boolean;
+  lastSeen?: string;
 };
 
 export type PollOption = {
@@ -198,4 +199,12 @@ export type AuthSession = {
 
 export type AuthMessage = {
   message: string;
+};
+
+export type PostStats = {
+  postId: string;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  saveCount: number;
 };

@@ -21,6 +21,7 @@ class ProfileDTO(UserDTO):
     is_private: bool = False
     follow_status: Literal["self", "not_following", "following", "requested"] = "not_following"
     can_view_posts: bool = True
+    last_seen: datetime | None = None
 
 
 class CommentDTO(BaseModel):

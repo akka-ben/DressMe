@@ -1,35 +1,68 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Bookmark, CheckCircle2, Grid3X3, Settings, Tag, Video } from "lucide-react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  Bookmark,
+  CheckCircle2,
+  Grid3X3,
+  Settings,
+  Tag,
+  Video,
+} from "lucide-react-native";
 
-import { currentUser, posts } from "../data/fashionData";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
-import type { Post } from "../types/contracts";
+import type { Post, Profile } from "../types/contracts";
 
 type ProfileTab = "posts" | "saved" | "videos" | "tagged";
 
 type Props = {
   onOpenPost?: (postId: string) => void;
+  onEditProfile?: () => void;
+  onOpenFollowers?: (userId: string) => void;
+  onOpenFollowing?: (userId: string) => void;
 };
 
-export function ProfileScreen({ onOpenPost }: Props) {
+export function ProfileScreen({ onOpenPost, onEditProfile, onOpenFollowers, onOpenFollowing }: Props) {
   const { token, user } = useAuth();
+
   const [active, setActive] = useState<ProfileTab>("posts");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [savedPosts, setSavedPosts] = useState<Post[]>([]);
   const [savedVideos, setSavedVideos] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadingSaved, setLoadingSaved] = useState(false);
-  const displayName = `${user?.firstName ?? currentUser.name.split(" ")[0]} ${user?.lastName ?? ""}`.trim();
-  const username = user?.email ? user.email.split("@")[0] : currentUser.username;
-  const avatar = user?.avatarUrl || currentUser.avatar;
 
-  const loadSaved = useCallback(async () => {
-    if (!token) {
-      return;
+  // ── Charger le profil + posts de l'utilisateur connecté ──────────────────
+  const loadProfile = useCallback(async () => {
+    if (!token || !user?.id) return;
+    setLoading(true);
+    try {
+      const [profileData, postsData] = await Promise.all([
+        client.getProfile(user.id),
+        client.getMyPosts(token),
+      ]);
+      setProfile(profileData);
+      setMyPosts(postsData);
+    } catch (e) {
+      console.warn("Erreur chargement profil:", e);
+    } finally {
+      setLoading(false);
     }
+  }, [token, user?.id]);
 
+  // ── Charger les posts enregistrés ─────────────────────────────────────────
+  const loadSaved = useCallback(async () => {
+    if (!token) return;
     setLoadingSaved(true);
     try {
       const [savedResponse, videoResponse] = await Promise.all([
@@ -44,85 +77,176 @@ export function ProfileScreen({ onOpenPost }: Props) {
   }, [token]);
 
   useEffect(() => {
+    void loadProfile();
     void loadSaved();
-  }, [loadSaved]);
+  }, [loadProfile, loadSaved]);
 
-  const mockVisiblePosts = posts.slice(0, active === "tagged" ? 4 : 6);
-  const realVisiblePosts = active === "videos" ? savedVideos : savedPosts;
-  const useRealGrid = active === "saved" || active === "videos";
+  // ── Données affichées selon l'onglet actif ────────────────────────────────
+  const displayName =
+    `${profile?.firstName ?? user?.firstName ?? ""} ${profile?.lastName ?? user?.lastName ?? ""}`.trim();
+  const username = user?.email ? user.email.split("@")[0] : "moi";
+  const avatar = profile?.avatarUrl ?? user?.avatarUrl;
 
+  const gridPosts =
+    active === "posts"
+      ? myPosts
+      : active === "saved"
+        ? savedPosts
+        : active === "videos"
+          ? savedVideos
+          : [];
+
+  const isRealGrid = active !== "tagged";
+  const isGridLoading =
+    loading || (loadingSaved && (active === "saved" || active === "videos"));
+
+  // ── Rendu ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.shell}>
+      {/* En-tête */}
       <View style={styles.header}>
         <Text style={styles.username}>@{username}</Text>
-        <Settings size={22} color={colors.burgundy} />
+        <Pressable onPress={onEditProfile}>
+          <Settings size={22} color={colors.burgundy} />
+        </Pressable>
       </View>
 
+      {/* Carte profil */}
       <View style={styles.card}>
         <View style={styles.profileTop}>
-          <Image source={{ uri: avatar }} style={styles.avatar} />
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarInitials}>
+                {(profile?.firstName ?? user?.firstName ?? "?")[0].toUpperCase()}
+              </Text>
+            </View>
+          )}
           <View style={styles.stats}>
-            <Stat label="Publications" value={String(posts.length)} />
-            <Stat label="Abonnés" value={formatNumber(currentUser.followers)} />
-            <Stat label="Abonnements" value={String(currentUser.following)} />
+            <Stat
+              label="Publications"
+              value={String(profile?.postCount ?? myPosts.length)}
+            />
+            <Pressable onPress={() => user?.id && onOpenFollowers?.(user.id)}>
+              <Stat label="Abonnés" value={formatNumber(profile?.followerCount ?? 0)} />
+            </Pressable>
+            <Pressable onPress={() => user?.id && onOpenFollowing?.(user.id)}>
+              <Stat label="Abonnements" value={formatNumber(profile?.followingCount ?? 0)} />
+            </Pressable>
           </View>
         </View>
+
         <View style={styles.nameLine}>
-          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.name}>{displayName || "—"}</Text>
           <CheckCircle2 size={17} color={colors.gold} fill={colors.gold} />
         </View>
-        <Text style={styles.bio}>{currentUser.bio}</Text>
-        <Text style={styles.city}>{currentUser.city} · Minimal & streetwear</Text>
-        <PrimaryButton label="Modifier le profil" variant="secondary" onPress={() => undefined} />
+
+        {profile?.bio ? (
+          <Text style={styles.bio}>{profile.bio}</Text>
+        ) : (
+          <Text style={[styles.bio, { color: colors.muted }]}>
+            Aucune bio renseignée
+          </Text>
+        )}
+
+        <PrimaryButton
+          label="Modifier le profil"
+          variant="secondary"
+          onPress={onEditProfile ?? (() => undefined)}
+        />
       </View>
 
+      {/* Onglets */}
       <View style={styles.tabs}>
-        <ProfileTabButton active={active === "posts"} label="Publications" Icon={Grid3X3} onPress={() => setActive("posts")} />
-        <ProfileTabButton active={active === "saved"} label="Enregistrés" Icon={Bookmark} onPress={() => setActive("saved")} />
-        <ProfileTabButton active={active === "videos"} label="Vidéos" Icon={Video} onPress={() => setActive("videos")} />
-        <ProfileTabButton active={active === "tagged"} label="Tagués" Icon={Tag} onPress={() => setActive("tagged")} />
+        <ProfileTabButton
+          active={active === "posts"}
+          label="Publications"
+          Icon={Grid3X3}
+          onPress={() => setActive("posts")}
+        />
+        <ProfileTabButton
+          active={active === "saved"}
+          label="Enregistrés"
+          Icon={Bookmark}
+          onPress={() => setActive("saved")}
+        />
+        <ProfileTabButton
+          active={active === "videos"}
+          label="Vidéos"
+          Icon={Video}
+          onPress={() => setActive("videos")}
+        />
+        <ProfileTabButton
+          active={active === "tagged"}
+          label="Tagués"
+          Icon={Tag}
+          onPress={() => setActive("tagged")}
+        />
       </View>
 
-      {loadingSaved && useRealGrid ? (
+      {/* Grille */}
+      {active === "tagged" ? (
+        <View style={styles.emptySaved}>
+          <Text style={styles.emptyTitle}>Fonctionnalité à venir</Text>
+          <Text style={styles.emptyText}>
+            Les publications où vous êtes tagué apparaîtront ici.
+          </Text>
+        </View>
+      ) : isGridLoading ? (
         <View style={styles.loadingBox}>
           <ActivityIndicator color={colors.burgundy} />
-          <Text style={styles.emptyText}>Chargement des enregistrements...</Text>
+          <Text style={styles.emptyText}>Chargement...</Text>
         </View>
-      ) : useRealGrid ? (
+      ) : isRealGrid ? (
         <View style={styles.grid}>
-          {realVisiblePosts.map((post) => (
-            <Pressable key={post.id} style={styles.tileWrap} onPress={() => onOpenPost?.(post.id)}>
+          {gridPosts.map((post) => (
+            <Pressable
+              key={post.id}
+              style={styles.tileWrap}
+              onPress={() => onOpenPost?.(post.id)}
+            >
               {post.mediaType === "video" && isVideoUrl(post.imageUrls[0]) ? (
                 <View style={styles.videoTilePlaceholder}>
                   <Video size={24} color={colors.white} />
                 </View>
+              ) : post.imageUrls[0] ? (
+                <Image
+                  source={{ uri: post.imageUrls[0] }}
+                  style={styles.tileImage}
+                />
               ) : (
-                <Image source={{ uri: post.imageUrls[0] }} style={styles.tileImage} />
+                <View style={styles.videoTilePlaceholder} />
               )}
-              {post.mediaType === "video" ? <Text style={styles.videoBadge}>Video</Text> : null}
+              {post.mediaType === "video" && (
+                <Text style={styles.videoBadge}>Vidéo</Text>
+              )}
             </Pressable>
           ))}
-          {!realVisiblePosts.length ? (
+
+          {gridPosts.length === 0 && (
             <View style={styles.emptySaved}>
               <Text style={styles.emptyTitle}>
-                {active === "videos" ? "Aucune video enregistree" : "Aucun post enregistre"}
+                {active === "posts"
+                  ? "Aucune publication"
+                  : active === "videos"
+                    ? "Aucune vidéo enregistrée"
+                    : "Aucun post enregistré"}
               </Text>
               <Text style={styles.emptyText}>
-                Ouvre une publication puis touche l'icone bookmark pour l'ajouter ici.
+                {active === "posts"
+                  ? "Vos publications apparaîtront ici."
+                  : "Touchez l'icône bookmark sur une publication pour l'enregistrer."}
               </Text>
             </View>
-          ) : null}
+          )}
         </View>
-      ) : (
-        <View style={styles.grid}>
-          {mockVisiblePosts.map((post) => (
-            <Image key={post.id} source={{ uri: post.image }} style={styles.tile} />
-          ))}
-        </View>
-      )}
+      ) : null}
     </View>
   );
 }
+
+// ── Sous-composants ──────────────────────────────────────────────────────────
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -145,28 +269,36 @@ function ProfileTabButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.tab, active && styles.tabActive]} onPress={onPress}>
+    <Pressable
+      style={[styles.tab, active && styles.tabActive]}
+      onPress={onPress}
+    >
       <Icon size={18} color={active ? colors.burgundy : colors.muted} />
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
 
+// ── Utilitaires ──────────────────────────────────────────────────────────────
+
 function formatNumber(value: number): string {
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}k`;
-  }
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
 }
 
 function isVideoUrl(url?: string): boolean {
-  return Boolean(url?.toLowerCase().split("?")[0].match(/\.(mp4|mov|m4v|webm)$/));
+  return Boolean(
+    url?.toLowerCase().split("?")[0].match(/\.(mp4|mov|m4v|webm)$/)
+  );
 }
 
+// ── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  shell: {
-    gap: 13,
-  },
+  shell: { gap: 13 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -200,42 +332,27 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.gold,
   },
+  avatarPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.burgundy,
+  },
+  avatarInitials: {
+    color: colors.white,
+    fontSize: 32,
+    fontWeight: "900",
+  },
   stats: {
     flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  stat: {
-    alignItems: "center",
-    gap: 3,
-  },
-  statValue: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 17,
-  },
-  statLabel: {
-    color: colors.muted,
-    fontSize: 10,
-  },
-  nameLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  name: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 16,
-  },
-  bio: {
-    color: colors.text,
-    lineHeight: 19,
-  },
-  city: {
-    color: colors.muted,
-    fontSize: 13,
-  },
+  stat: { alignItems: "center", gap: 3 },
+  statValue: { color: colors.text, fontWeight: "900", fontSize: 17 },
+  statLabel: { color: colors.muted, fontSize: 10 },
+  nameLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  name: { color: colors.text, fontWeight: "900", fontSize: 16 },
+  bio: { color: colors.text, lineHeight: 19 },
   tabs: {
     flexDirection: "row",
     backgroundColor: colors.white,
@@ -252,36 +369,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.md,
   },
-  tabActive: {
-    backgroundColor: colors.cream,
-  },
-  tabText: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  tabTextActive: {
-    color: colors.burgundy,
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 2,
-  },
-  tile: {
-    width: "32.9%",
-    aspectRatio: 1,
-    backgroundColor: colors.beige,
-  },
+  tabActive: { backgroundColor: colors.cream },
+  tabText: { color: colors.muted, fontSize: 10, fontWeight: "700" },
+  tabTextActive: { color: colors.burgundy },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
   tileWrap: {
     width: "32.9%",
     aspectRatio: 1,
     backgroundColor: colors.beige,
   },
-  tileImage: {
-    width: "100%",
-    height: "100%",
-  },
+  tileImage: { width: "100%", height: "100%" },
   videoBadge: {
     position: "absolute",
     right: 5,
@@ -321,13 +418,6 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 4,
   },
-  emptyTitle: {
-    color: colors.text,
-    fontWeight: "900",
-  },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  emptyTitle: { color: colors.text, fontWeight: "900" },
+  emptyText: { color: colors.muted, fontSize: 13, lineHeight: 18 },
 });

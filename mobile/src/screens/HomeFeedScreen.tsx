@@ -110,9 +110,10 @@ type HomeFeedScreenProps = {
   onOpenPost?: (postId: string) => void;
   onOpenCreate?: () => void;
   onOpenLive?: (session: LiveSession) => void;
+  onOpenProfile?: (userId: string) => void;
 };
 
-export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive }: HomeFeedScreenProps) {
+export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenProfile }: HomeFeedScreenProps) {
   const { token, user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
@@ -423,6 +424,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive }: HomeFee
       <PostCard
         post={item}
         onOpen={() => onOpenPost?.(item.sourcePostId)}
+        onOpenProfile={() => onOpenProfile?.(item.author.id)}
         onHelp={() => setShowStylist(true)}
         onLike={() => toggleLike(item.feedId)}
         onSave={() => toggleSave(item.feedId)}
@@ -431,7 +433,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive }: HomeFee
         onVote={(optionId) => votePoll(item.feedId, optionId)}
       />
     ),
-    [onOpenPost, sharePost, toggleLike, toggleSave, votePoll],
+    [onOpenPost, onOpenProfile, sharePost, toggleLike, toggleSave, votePoll],
   );
 
   const markStoryAsViewed = useCallback((storyId: string) => {
@@ -889,6 +891,7 @@ function isVideoUrl(url?: string): boolean {
 const PostCard = memo(function PostCard({
   post,
   onOpen,
+  onOpenProfile,
   onHelp,
   onLike,
   onSave,
@@ -898,6 +901,7 @@ const PostCard = memo(function PostCard({
 }: {
   post: FeedPost;
   onOpen: () => void;
+  onOpenProfile: () => void;
   onHelp: () => void;
   onLike: () => void;
   onSave: () => void;
@@ -905,6 +909,7 @@ const PostCard = memo(function PostCard({
   onOpenMenu: () => void;
   onVote: (optionId: string) => void;
 }) {
+
   const user = post.author;
   const totalVotes = post.pollOptions?.reduce((sum, option) => sum + option.votes, 0) ?? 0;
   const isVideo = post.mediaType === "video" || isVideoUrl(post.image);
@@ -912,7 +917,9 @@ const PostCard = memo(function PostCard({
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
-        <Image source={{ uri: user.avatar }} style={styles.postAvatar} />
+        <Pressable onPress={onOpenProfile}>
+          <Image source={{ uri: user.avatar }} style={styles.postAvatar} />
+        </Pressable>
         <View style={styles.postIdentity}>
           <View style={styles.nameLine}>
             <Text style={styles.postName}>{user.name}</Text>

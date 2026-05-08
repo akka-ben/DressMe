@@ -15,6 +15,7 @@ from app.schemas.auth import (
     VerifyEmailRequest,
     VerifyOTPRequest,
 )
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -95,6 +96,20 @@ async def verify_otp(
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> TokenResponse:
     return await service.verify_otp(db, payload)
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: service.UserDocument = Depends(service.get_current_user),
+) -> MessageResponse:
+    await service.change_password(db, current_user, payload.current_password, payload.new_password)
+    return MessageResponse(message="Password changed successfully.")
 
 
 @router.get("/me", response_model=UserResponse)

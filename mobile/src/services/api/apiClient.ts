@@ -11,6 +11,7 @@ import type {
   Poll,
   PollOption,
   Post,
+  PostStats,
   Profile,
   SearchHashtag,
   SearchPlace,
@@ -68,6 +69,7 @@ type BackendProfile = BackendUser & {
   is_private?: boolean;
   follow_status?: "self" | "not_following" | "following" | "requested";
   can_view_posts?: boolean;
+  last_seen?: string | null;
 };
 
 type BackendPollOption = {
@@ -358,6 +360,94 @@ export class ApiDressMeClient implements DressMeClient {
     return mapUser(user);
   }
 
+  async getMyPosts(token: string): Promise<Post[]> {
+    const posts = await this.request<BackendPost[]>("/users/me/posts", undefined, token);
+    return posts.map(mapPost);
+  }
+
+  async updateProfile(
+    userId: string,
+    data: { firstName?: string; lastName?: string; bio?: string; avatarUrl?: string },
+    token: string,
+  ): Promise<Profile> {
+    const profile = await this.request<BackendProfile>(
+      `/users/${userId}/profile`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          first_name: data.firstName,
+          last_name: data.lastName,
+          bio: data.bio,
+          avatar_url: data.avatarUrl,
+        }),
+      },
+      token,
+    );
+    return mapProfile(profile);
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    token: string,
+  ): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      "/auth/change-password",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      },
+      token,
+    );
+  }
+
+  async getUserPosts(userId: string, token?: string): Promise<Post[]> {
+    const posts = await this.request<BackendPost[]>(
+      `/users/${userId}/posts`,
+      undefined,
+      token,
+    );
+    return posts.map(mapPost);
+  }
+
+  async getUserFollowers(userId: string, token?: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>(
+      `/users/${userId}/followers`,
+      undefined,
+      token,
+    );
+    return users.map(mapUser);
+  }
+
+  async getSuggestions(userId: string, token?: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>(
+      `/users/${userId}/suggestions`,
+      undefined,
+      token,
+    );
+    return users.map(mapUser);
+  }
+
+  async getFollowing(userId: string, token?: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>(
+      `/users/${userId}/following`,
+      undefined,
+      token,
+    );
+    return users.map(mapUser);
+  }
+
+  async blockUser(userId: string, token: string): Promise<void> {
+    await this.request<{ blocked: boolean }>(`/users/${userId}/block`, { method: "POST" }, token);
+  }
+
+  async unblockUser(userId: string, token: string): Promise<void> {
+    await this.request<{ blocked: boolean }>(`/users/${userId}/unblock`, { method: "POST" }, token);
+  }
+
   async search(input?: { query?: string; token?: string; limit?: number }): Promise<SearchResults> {
     const params = new URLSearchParams();
     if (input?.query) {
@@ -488,6 +578,9 @@ export class ApiDressMeClient implements DressMeClient {
     return users.map(mapUser);
   }
 
+  async pingOnline(token: string): Promise<void> {
+    await this.request<{ status: string }>("/users/me/ping", undefined, token);
+}
   async getPost(postId: string, input?: { token?: string }): Promise<Post> {
     const post = await this.request<BackendPost>(
       `/posts/${postId}`,
@@ -496,6 +589,7 @@ export class ApiDressMeClient implements DressMeClient {
     );
     return mapPost(post);
   }
+
 
   async createPost(
     input: {
@@ -731,7 +825,25 @@ export class ApiDressMeClient implements DressMeClient {
     });
     return recommendations.map(mapAIRecommendation);
   }
+
+  async getPostStats(postId: string, token: string): Promise<PostStats> {
+    const stats = await this.request<{
+      post_id: string;
+      like_count: number;
+      comment_count: number;
+      share_count: number;
+      save_count: number;
+    }>(`/posts/${postId}/stats`, undefined, token);
+    return {
+      postId: stats.post_id,
+      likeCount: stats.like_count,
+      commentCount: stats.comment_count,
+      shareCount: stats.share_count,
+      saveCount: stats.save_count,
+    };
+  }
 }
+
 
 function mapAuthSession(session: BackendAuthSession): AuthSession {
   return {
@@ -815,6 +927,7 @@ function mapProfile(profile: BackendProfile): Profile {
     isPrivate,
     followStatus: profile.follow_status ?? "not_following",
     canViewPosts: profile.can_view_posts ?? !isPrivate,
+    lastSeen: profile.last_seen ?? undefined,
   };
 }
 

@@ -1,6 +1,6 @@
 import { mockComments, mockPosts, mockProfile, mockRecommendations } from "./mockData";
 import type { DressMeClient } from "../types";
-import type { ActivityNotification, AuthMessage, AuthSession, Comment, LiveSession, MediaUpload, Post, SearchResults, Story, User } from "../../types/contracts";
+import type { ActivityNotification, AuthMessage, AuthSession, Comment, LiveSession, MediaUpload, Post, PostStats, Profile, SearchResults, Story, User } from "../../types/contracts";
 
 
 const delay = async (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -156,5 +156,55 @@ export class MockDressMeClient implements DressMeClient {
   async helpMeChoose() {
     await delay(600);
     return mockRecommendations;
+  }
+
+  async getMyPosts(): Promise<Post[]> {
+    await delay();
+    return mockPosts;
+  }
+
+  async updateProfile(): Promise<Profile> {
+    throw new Error("Mock updateProfile is disabled. Use ApiDressMeClient.");
+  }
+
+  async getUserPosts(): Promise<Post[]> {
+    await delay();
+    return mockPosts;
+  }
+
+  async getUserFollowers(): Promise<User[]> {
+    await delay();
+    return [];
+  }
+
+  async getFollowing(): Promise<User[]> {
+    await delay();
+    return [];
+  }
+
+  async changePassword(): Promise<{ message: string }> {
+    throw new Error("Mock changePassword is disabled. Use ApiDressMeClient.");
+  }
+
+  async pingOnline(): Promise<void> {
+    return;
+  }
+
+  async getSuggestions(): Promise<User[]> {
+    await delay();
+    return [];
+  }
+
+  async blockUser(): Promise<void> {
+    return;
+  }
+
+  async unblockUser(): Promise<void> {
+    return;
+  }
+
+  async getPostStats(): Promise<PostStats> {
+    await delay();
+    return { postId: "", likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0 };
   }
 }

@@ -1,4 +1,5 @@
-from pydantic import AliasChoices, EmailStr, Field, field_validator
+import json
+from pydantic import AliasChoices, EmailStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,9 +28,10 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = Field(
         default=7, alias="BACKEND_REFRESH_TOKEN_EXPIRE_DAYS"
     )
+
     mongodb_url: str = Field(default="mongodb://localhost:27017", alias="MONGODB_URL")
-    mongodb_db_name: str = Field(default="dressme", alias="MONGODB_DB_NAME")
-    redis_url: str = Field(alias="REDIS_URL")
+    mongodb_db_name: str = Field(default="dressmechat", alias="MONGODB_DB_NAME")
+    redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
 
     auto_create_indexes: bool = Field(
         default=True,
@@ -46,12 +48,10 @@ class Settings(BaseSettings):
     media_upload_max_mb: int = Field(default=50, alias="MEDIA_UPLOAD_MAX_MB")
 
     email_verification_token_expire_hours: int = Field(
-        default=24,
-        alias="EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS",
+        default=24, alias="EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS"
     )
     password_reset_token_expire_minutes: int = Field(
-        default=30,
-        alias="PASSWORD_RESET_TOKEN_EXPIRE_MINUTES",
+        default=30, alias="PASSWORD_RESET_TOKEN_EXPIRE_MINUTES"
     )
     otp_expire_minutes: int = Field(default=5, alias="OTP_EXPIRE_MINUTES")
     otp_length: int = Field(default=6, ge=4, le=8, alias="OTP_LENGTH")
@@ -65,20 +65,27 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=False, alias="SMTP_USE_TLS")
     smtp_timeout_seconds: int = Field(default=10, alias="SMTP_TIMEOUT_SECONDS")
 
-    cors_origins: list[str] = Field(
-        default=["http://localhost:8081", "http://localhost:19006"],
+    # Keep the raw env value to support comma-separated CORS origins.
+    cors_origins_raw: str = Field(
+        default="http://localhost:8081,http://localhost:19006",
         validation_alias=AliasChoices("CORS_ORIGINS", "BACKEND_CORS_ORIGINS"),
     )
 
     use_mock_ai: bool = Field(default=True, alias="USE_MOCK_AI")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+    @property
+    def cors_origins(self) -> list[str]:
+        value = self.cors_origins_raw.strip()
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+            except Exception:
+                pass
+            else:
+                if isinstance(parsed, list):
+                    return [str(origin).strip() for origin in parsed if str(origin).strip()]
+        return [o.strip() for o in value.split(",") if o.strip()]
 
 
 settings = Settings()

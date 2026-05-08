@@ -28,6 +28,11 @@ import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { MessagesScreen } from "./src/screens/MessagesScreen";
 import { colors, fonts } from "./src/theme/dressme";
+import { EditProfileScreen } from "./src/screens/EditProfileScreen";
+import { UserProfileScreen } from "./src/screens/UserProfileScreen";
+import { FollowersScreen } from "./src/screens/FollowersScreen";
+import { ChangePasswordScreen } from "./src/screens/ChangePasswordScreen";
+import { client } from "./src/services";
 import type { LiveSession } from "./src/types/contracts";
 
 const splashGif = require("./assets/dressme-splash.gif");
@@ -56,7 +61,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated, isLoading, logout, user } = useAuth();
+  const { isAuthenticated, isLoading, logout, user, token } = useAuth();
   const [authRoute, setAuthRoute] = useState<AuthRoute>("onboarding");
   const [activeTab, setActiveTab] = useState<AppTab>("feed");
   const [lastRegisteredEmail, setLastRegisteredEmail] = useState("");
@@ -65,6 +70,13 @@ function AppShell() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [liveRoute, setLiveRoute] = useState<LiveRoute | null>(null);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [followersState, setFollowersState] = useState<{
+    userId: string;
+    mode: "followers" | "following";
+  } | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 3500);
@@ -74,19 +86,25 @@ function AppShell() {
   useEffect(() => {
     const handleUrl = (url: string | null) => {
       const token = extractResetToken(url);
-      if (!token) {
-        return;
-      }
-
+      if (!token) return;
       setResetToken(token);
       setAuthRoute("reset");
     };
 
     void Linking.getInitialURL().then(handleUrl);
     const subscription = Linking.addEventListener("url", ({ url }) => handleUrl(url));
-
     return () => subscription.remove();
   }, []);
+
+  // Ping online toutes les 2 minutes
+  useEffect(() => {
+    if (!token) return;
+    void client.pingOnline(token);
+    const interval = setInterval(() => {
+      void client.pingOnline(token);
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [token]);
 
   const renderAuth = () => {
     switch (authRoute) {
@@ -182,6 +200,15 @@ function AppShell() {
 
     switch (activeTab) {
       case "feed":
+        if (viewingUserId) {
+          return (
+            <UserProfileScreen
+              userId={viewingUserId}
+              onBack={() => setViewingUserId(null)}
+              onOpenPost={setSelectedPostId}
+            />
+          );
+        }
         return (
           <HomeFeedScreen
             onOpenPost={setSelectedPostId}
@@ -194,22 +221,69 @@ function AppShell() {
               setSelectedPostId(null);
               setShowCreatePost(true);
             }}
+            onOpenProfile={(userId: string) => setViewingUserId(userId)}
           />
         );
+
       case "search":
         return <SearchScreen onOpenPost={setSelectedPostId} />;
       case "reels":
         return <ReelsScreen onOpenPost={setSelectedPostId} />;
+
       case "messages":
         return <MessagesScreen />;
+
       case "profile":
-        return <ProfileScreen onOpenPost={setSelectedPostId} />;
+        if (showChangePassword) {
+          return (
+            <ChangePasswordScreen
+              onBack={() => setShowChangePassword(false)}
+            />
+          );
+        }
+        if (followersState) {
+          return (
+            <FollowersScreen
+              userId={followersState.userId}
+              mode={followersState.mode}
+              onBack={() => setFollowersState(null)}
+              onOpenProfile={(uid) => {
+                setFollowersState(null);
+                setViewingUserId(uid);
+              }}
+            />
+          );
+        }
+        if (showEditProfile) {
+          return (
+            <EditProfileScreen
+              onBack={() => setShowEditProfile(false)}
+              onSaved={() => setShowEditProfile(false)}
+              onChangePassword={() => {
+                setShowEditProfile(false);
+                setShowChangePassword(true);
+              }}
+            />
+          );
+        }
+        return (
+          <ProfileScreen
+            onOpenPost={setSelectedPostId}
+            onEditProfile={() => setShowEditProfile(true)}
+            onOpenFollowers={(uid) => setFollowersState({ userId: uid, mode: "followers" })}
+            onOpenFollowing={(uid) => setFollowersState({ userId: uid, mode: "following" })}
+          />
+        );
     }
   };
 
   const changeTab = (tab: AppTab) => {
     setSelectedPostId(null);
     setShowCreatePost(false);
+    setShowEditProfile(false);
+    setShowChangePassword(false);
+    setViewingUserId(null);
+    setFollowersState(null);
     setActiveTab(tab);
   };
 
@@ -243,9 +317,7 @@ function AppShell() {
                   <ActivityIndicator color={colors.burgundy} />
                 </View>
               ) : isAuthenticated && authRoute !== "reset" ? (
-                <View style={styles.tabScreen}>
-                  {renderTab()}
-                </View>
+                <View style={styles.tabScreen}>{renderTab()}</View>
               ) : (
                 <ScrollView
                   style={styles.screen}
@@ -270,15 +342,9 @@ function AppShell() {
 }
 
 function extractResetToken(url: string | null): string | null {
-  if (!url || !url.includes("reset-password")) {
-    return null;
-  }
-
+  if (!url || !url.includes("reset-password")) return null;
   const match = url.match(/[?&]token=([^&#]+)/);
-  if (!match?.[1]) {
-    return null;
-  }
-
+  if (!match?.[1]) return null;
   return decodeURIComponent(match[1].replace(/\+/g, "%20"));
 }
 
