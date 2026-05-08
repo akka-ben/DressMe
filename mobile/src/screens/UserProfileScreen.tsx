@@ -7,26 +7,21 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  Grid3X3,
-  MessageCircle,
-  UserCheck,
-  UserPlus,
-  Video,
-} from "lucide-react-native";
-
+import { ArrowLeft, CheckCircle2, Grid3X3, MessageCircle, Share2, UserCheck, UserPlus, Video } from "lucide-react-native";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
-import type { Post, Profile } from "../types/contracts";
+import type { Post, Profile, User } from "../types/contracts";
+import { isOnline } from "../utils/onlineStatus";
+import { Share } from "react-native";
+
 
 type Props = {
   userId: string;
   onBack?: () => void;
   onOpenPost?: (postId: string) => void;
   onMessage?: (userId: string) => void;
+  onOpenProfile?: (userId: string) => void; // ← ajouté
 };
 
 type Tab = "posts" | "videos";
@@ -36,6 +31,7 @@ export function UserProfileScreen({
   onBack,
   onOpenPost,
   onMessage,
+  onOpenProfile, // ← ajouté
 }: Props) {
   const { token, user: me } = useAuth();
 
@@ -45,17 +41,21 @@ export function UserProfileScreen({
   const [followLoading, setFollowLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("posts");
+  const [suggestions, setSuggestions] = useState<User[]>([]);
 
   // ── Charger le profil + posts ────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [profileData, postsData] = await Promise.all([
+      const [profileData, postsData, suggestionsData] = await Promise.all([
         client.getProfile(userId),
         client.getUserPosts(userId, token ?? undefined),
+        client.getSuggestions(userId, token ?? undefined),
       ]);
+
       setProfile(profileData);
       setPosts(postsData);
+      setSuggestions(suggestionsData);
     } catch (e) {
       console.warn("Erreur chargement profil utilisateur:", e);
     } finally {
@@ -109,6 +109,18 @@ export function UserProfileScreen({
     ? profile.email.split("@")[0]
     : "utilisateur";
 
+  const shareProfile = async () => {
+  const name = displayName !== "—" ? displayName : `@${username}`;
+  try {
+    await Share.share({
+      title: `Profil de ${name} sur DressMe`,
+      message: `Découvre le profil de ${name} sur DressMe 👗\ndressme://profile/${userId}`,
+    });
+  } catch (e) {
+    console.warn("Erreur partage:", e);
+  }
+};
+
   return (
     <View style={styles.shell}>
       {/* Header */}
@@ -119,7 +131,9 @@ export function UserProfileScreen({
         <Text style={styles.headerTitle} numberOfLines={1}>
           @{username}
         </Text>
-        <View style={{ width: 38 }} />
+        <Pressable style={styles.shareBtn} onPress={() => void shareProfile()}>
+          <Share2 size={18} color={colors.burgundy} />
+        </Pressable>
       </View>
 
       {loading ? (
@@ -132,18 +146,23 @@ export function UserProfileScreen({
           {/* Carte profil */}
           <View style={styles.card}>
             <View style={styles.profileTop}>
-              {profile?.avatarUrl ? (
-                <Image
-                  source={{ uri: profile.avatarUrl }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Text style={styles.avatarInitials}>
-                    {(profile?.firstName || "?")[0].toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <View>
+                {profile?.avatarUrl ? (
+                  <Image
+                    source={{ uri: profile.avatarUrl }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarInitials}>
+                      {(profile?.firstName || "?")[0].toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                {isOnline(profile?.lastSeen) && (
+                  <View style={styles.onlineDot} />
+                )}
+              </View>
 
               <View style={styles.stats}>
                 <Stat
@@ -231,6 +250,35 @@ export function UserProfileScreen({
               onPress={() => setActiveTab("videos")}
             />
           </View>
+
+          {/* Suggestions — seulement si des suggestions existent et que ce n'est pas son propre profil */}
+          {suggestions.length > 0 && !isOwnProfile && (
+            <View style={styles.suggestionsBox}>
+              <Text style={styles.suggestionsTitle}>Vous connaissez peut-être</Text>
+              <View style={styles.suggestionsList}>
+                {suggestions.map((s) => (
+                  <Pressable
+                    key={s.id}
+                    style={styles.suggestionItem}
+                    onPress={() => onOpenProfile?.(s.id)}
+                  >
+                    {s.avatarUrl ? (
+                      <Image source={{ uri: s.avatarUrl }} style={styles.suggestionAvatar} />
+                    ) : (
+                      <View style={[styles.suggestionAvatar, styles.suggestionAvatarPlaceholder]}>
+                        <Text style={styles.suggestionInitials}>
+                          {(s.firstName || "?")[0].toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={styles.suggestionName} numberOfLines={1}>
+                      {`${s.firstName} ${s.lastName}`.trim() || "—"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Grille */}
           <View style={styles.grid}>
@@ -494,4 +542,74 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { color: colors.text, fontWeight: "900" },
   emptyText: { color: colors.muted, fontSize: 13, lineHeight: 18 },
+  onlineDot: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#22c55e",
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  suggestionsBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 10,
+    ...shadow.card,
+  },
+  suggestionsTitle: {
+    color: colors.text,
+    fontWeight: "900",
+    fontSize: 14,
+  },
+  suggestionsList: {
+    flexDirection: "row",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  suggestionItem: {
+    alignItems: "center",
+    gap: 5,
+    width: 60,
+  },
+  suggestionAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.beige,
+    borderWidth: 2,
+    borderColor: colors.gold,
+  },
+  suggestionAvatarPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.burgundy,
+  },
+  suggestionInitials: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 18,
+  },
+  suggestionName: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  shareBtn: {
+  width: 38,
+  height: 38,
+  borderRadius: 19,
+  backgroundColor: colors.white,
+  borderWidth: 1,
+  borderColor: colors.border,
+  alignItems: "center",
+  justifyContent: "center",
+  ...shadow.card,
+},
 });

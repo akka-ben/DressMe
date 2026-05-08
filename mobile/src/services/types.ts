@@ -5,6 +5,7 @@ import type {
   Comment,
   MediaUpload,
   Post,
+  PostStats,
   Profile,
   Story,
   User,
@@ -26,6 +27,8 @@ export interface DressMeClient {
   uploadMedia(input: { uri: string; name: string; type: string }, token: string): Promise<MediaUpload>;
   getStories(input?: { token?: string; limit?: number }): Promise<Story[]>;
   getStoryViewers(storyId: string, token: string): Promise<User[]>;
+  getPostStats(postId: string, token: string): Promise<PostStats>;
+
   createStory(
     input: {
       mediaUrl: string;
@@ -67,10 +70,12 @@ export interface DressMeClient {
   ): Promise<Profile>;
   followUser(userId: string, token: string): Promise<{ following: boolean }>;
   unfollowUser(userId: string, token: string): Promise<{ following: boolean }>;
-  
   getUserPosts(userId: string, token?: string): Promise<Post[]>;
   getFollowing(userId: string, token?: string): Promise<User[]>;
   getUserFollowers(userId: string, token?: string): Promise<User[]>;
+  getSuggestions(userId: string, token?: string): Promise<User[]>;
   changePassword(currentPassword: string, newPassword: string, token: string): Promise<{ message: string }>;
   pingOnline(token: string): Promise<void>;
+  blockUser(userId: string, token: string): Promise<void>;
+  unblockUser(userId: string, token: string): Promise<void>;
 }

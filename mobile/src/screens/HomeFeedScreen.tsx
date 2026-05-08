@@ -694,7 +694,9 @@ const PostCard = memo(function PostCard({
   return (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
-        <Image source={{ uri: user.avatar }} style={styles.postAvatar} />
+        <Pressable onPress={onOpenProfile}>
+          <Image source={{ uri: user.avatar }} style={styles.postAvatar} />
+        </Pressable>
         <View style={styles.postIdentity}>
           <View style={styles.nameLine}>
             <Text style={styles.postName}>{user.name}</Text>

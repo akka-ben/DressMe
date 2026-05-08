@@ -119,3 +119,11 @@ export type AuthSession = {
 export type AuthMessage = {
   message: string;
 };
+
+export type PostStats = {
+  postId: string;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  saveCount: number;
+};

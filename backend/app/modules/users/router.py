@@ -52,10 +52,25 @@ async def build_profile_dto(db: AsyncIOMotorDatabase, user: dict[str, Any]) -> P
         follower_count=follower_count,
         following_count=following_count,
         post_count=post_count,
+        last_seen=user.get("last_seen"),
     )
 
 
-# ─── GET /users/me/followers ─────────────────────────────────────────────────
+# ─── GET /users/me/ping ───────────────────────────────────────────────────────
+
+@router.get("/me/ping")
+async def ping(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
+) -> dict[str, str]:
+    await db.users.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"last_seen": utc_now()}}
+    )
+    return {"status": "ok"}
+
+
+# ─── GET /users/me/followers ──────────────────────────────────────────────────
 
 @router.get("/me/followers", response_model=list[UserDTO])
 async def get_my_followers(
@@ -104,79 +119,37 @@ async def get_my_posts(
     return [await post_to_dto(db, p, user_id) for p in posts]
 
 
-# ─── GET /users/{user_id} — Profil public ────────────────────────────────────
+# ─── GET /users/{user_id}/suggestions ────────────────────────────────────────
 
-@router.get("/{user_id}", response_model=ProfileDTO)
-async def get_user_profile(
+@router.get("/{user_id}/suggestions", response_model=list[UserDTO])
+async def get_suggestions(
     user_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
-) -> ProfileDTO:
-    user = await get_user_or_404(db, user_id)
-    return await build_profile_dto(db, user)
+) -> list[UserDTO]:
+    target_follows = await db.follows.find(
+        {"follower_id": user_id}
+    ).to_list(length=100)
+    target_following_ids = {str(doc["following_id"]) for doc in target_follows}
 
+    if not target_following_ids:
+        return []
 
-# ─── PUT /users/{user_id}/profile — Modifier le profil ───────────────────────
+    second_degree = await db.follows.find(
+        {"follower_id": {"$in": list(target_following_ids)}}
+    ).to_list(length=200)
 
-@router.put("/{user_id}/profile", response_model=ProfileDTO)
-async def update_profile(
-    user_id: str,
-    data: UpdateProfileInput,
-    db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
-) -> ProfileDTO:
-    if str(current_user["_id"]) != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Action non autorisée")
+    score: dict[str, int] = {}
+    for doc in second_degree:
+        uid = str(doc.get("following_id", ""))
+        if uid and uid != user_id and uid not in target_following_ids:
+            score[uid] = score.get(uid, 0) + 1
 
-    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    if not update_data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Aucune donnée à mettre à jour")
+    if not score:
+        return []
 
-    update_data["updated_at"] = utc_now()
-    await db.users.update_one({"_id": user_id}, {"$set": update_data})
-    user = await get_user_or_404(db, user_id)
-    return await build_profile_dto(db, user)
-
-
-# ─── POST /users/{user_id}/follow ────────────────────────────────────────────
-
-@router.post("/{user_id}/follow")
-async def follow_user(
-    user_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
-) -> dict[str, bool]:
-    current_id = str(current_user["_id"])
-
-    if current_id == user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tu ne peux pas te suivre toi-même")
-
-    await get_user_or_404(db, user_id)
-
-    existing = await db.follows.find_one({"follower_id": current_id, "following_id": user_id})
-    if existing:
-        return {"following": True}
-
-    follow_id = str(uuid4())
-    await db.follows.insert_one({
-        "_id": follow_id,
-        "follower_id": current_id,
-        "following_id": user_id,
-        "created_at": utc_now(),
-    })
-    return {"following": True}
-
-
-# ─── POST /users/{user_id}/unfollow ──────────────────────────────────────────
-
-@router.post("/{user_id}/unfollow")
-async def unfollow_user(
-    user_id: str,
-    db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
-) -> dict[str, bool]:
-    current_id = str(current_user["_id"])
-    await db.follows.delete_one({"follower_id": current_id, "following_id": user_id})
-    return {"following": False}
+    top_ids = sorted(score, key=lambda x: score[x], reverse=True)[:5]
+    users = await db.users.find({"_id": {"$in": top_ids}}).to_list(length=5)
+    return [user_to_dto(u, str(u.get("_id"))) for u in users]
 
 
 # ─── GET /users/{user_id}/followers ──────────────────────────────────────────
@@ -203,17 +176,14 @@ async def get_following(
     user_id: str,
     db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> list[UserDTO]:
-    follow_docs = await db
+    follow_docs = await db.follows.find({"follower_id": user_id}).to_list(length=100)
+    following_ids = [str(doc["following_id"]) for doc in follow_docs if doc.get("following_id")]
+
+    if not following_ids:
+        return []
+
+    users = await db.users.find({"_id": {"$in": following_ids}}).to_list(length=100)
+    return [user_to_dto(u, str(u.get("_id"))) for u in users]
 
 
-# GET /users/me/ping — mettre à jour last_seen
-@router.get("/me/ping")
-async def ping(
-    db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
-) -> dict[str, str]:
-    await db.users.update_one(
-        {"_id": current_user["_id"]},
-        {"$set": {"last_seen": utc_now()}}
-    )
-    return {"status": "ok"}
+# ─── GET /users/{user_id} — Profil public ───────────────────

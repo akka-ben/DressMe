@@ -5,9 +5,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
-import { ArrowLeft, UserCheck, UserPlus } from "lucide-react-native";
+
+import { ArrowLeft, Search, UserCheck, UserPlus } from "lucide-react-native";
 
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
@@ -23,7 +25,7 @@ type Props = {
 
 export function FollowersScreen({ userId, mode, onBack, onOpenProfile }: Props) {
   const { token, user: me } = useAuth();
-
+  const [search, setSearch] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
@@ -77,9 +79,25 @@ export function FollowersScreen({ userId, mode, onBack, onOpenProfile }: Props) 
   };
 
   const title = mode === "followers" ? "Abonnés" : "Abonnements";
-
+  const filteredUsers = users.filter((u) => {
+  const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+  const username = (u.email?.split("@")[0] ?? "").toLowerCase();
+  const q = search.toLowerCase();
+  return fullName.includes(q) || username.includes(q);
+});
   return (
     <View style={styles.shell}>
+      <View style={styles.searchBar}>
+        <Search size={16} color={colors.muted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Rechercher..."
+          placeholderTextColor={colors.muted}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+        />
+      </View>
       {/* Header */}
       <View style={styles.header}>
         <Pressable style={styles.backBtn} onPress={onBack}>
@@ -94,7 +112,7 @@ export function FollowersScreen({ userId, mode, onBack, onOpenProfile }: Props) 
           <ActivityIndicator color={colors.burgundy} size="large" />
           <Text style={styles.loadingText}>Chargement…</Text>
         </View>
-      ) : users.length === 0 ? (
+      ) : filteredUsers.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyTitle}>
             {mode === "followers" ? "Aucun abonné" : "Aucun abonnement"}
@@ -107,7 +125,7 @@ export function FollowersScreen({ userId, mode, onBack, onOpenProfile }: Props) 
         </View>
       ) : (
         <View style={styles.list}>
-          {users.map((u) => {
+          {filteredUsers.map((u) => {
             const isMe = u.id === me?.id;
             const isFollowing = followingIds.has(u.id);
             const fullName = `${u.firstName} ${u.lastName}`.trim() || "—";
@@ -273,5 +291,22 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "900",
     fontSize: 12,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow.card,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
   },
 });

@@ -146,4 +146,14 @@ async pingOnline(): Promise<void> {
   return;
 }
 
+async getSuggestions(): Promise<User[]> {
+  await delay();
+  return [];
+}
+async blockUser(): Promise<void> { return; }
+async unblockUser(): Promise<void> { return; }
+async getPostStats(): Promise<import("../../types/contracts").PostStats> {
+  await delay();
+  return { postId: "", likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0 };
+}
 }

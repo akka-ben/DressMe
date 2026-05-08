@@ -9,6 +9,7 @@ import type {
   Poll,
   PollOption,
   Post,
+  PostStats,
   Profile,
   Story,
   User,
@@ -335,6 +336,15 @@ async getUserFollowers(userId: string, token?: string): Promise<User[]> {
   return users.map(mapUser);
 }
 
+async getSuggestions(userId: string, token?: string): Promise<User[]> {
+  const users = await this.request<BackendUser[]>(
+    `/users/${userId}/suggestions`,
+    undefined,
+    token
+  );
+  return users.map(mapUser);
+}
+
 async getFollowing(userId: string, token?: string): Promise<User[]> {
   const users = await this.request<BackendUser[]>(
     `/users/${userId}/following`,
@@ -342,6 +352,14 @@ async getFollowing(userId: string, token?: string): Promise<User[]> {
     token
   );
   return users.map(mapUser);
+}
+
+async blockUser(userId: string, token: string): Promise<void> {
+  await this.request<{ blocked: boolean }>(`/users/${userId}/block`, { method: "POST" }, token);
+}
+
+async unblockUser(userId: string, token: string): Promise<void> {
+  await this.request<{ blocked: boolean }>(`/users/${userId}/unblock`, { method: "POST" }, token);
 }
 
   async getFeed(input?: { token?: string; limit?: number; offset?: number }): Promise<Post[]> {
@@ -467,6 +485,7 @@ async getFollowing(userId: string, token?: string): Promise<User[]> {
     );
     return mapPost(post);
   }
+
 
   async createPost(
     input: {
@@ -604,7 +623,24 @@ async getFollowing(userId: string, token?: string): Promise<User[]> {
     });
     return recommendations.map(mapAIRecommendation);
   }
+  async getPostStats(postId: string, token: string): Promise<PostStats> {
+  const stats = await this.request<{
+    post_id: string;
+    like_count: number;
+    comment_count: number;
+    share_count: number;
+    save_count: number;
+  }>(`/posts/${postId}/stats`, undefined, token);
+  return {
+    postId: stats.post_id,
+    likeCount: stats.like_count,
+    commentCount: stats.comment_count,
+    shareCount: stats.share_count,
+    saveCount: stats.save_count,
+  };
 }
+}
+
 
 function mapAuthSession(session: BackendAuthSession): AuthSession {
   return {
@@ -722,3 +758,5 @@ function mapAIRecommendationItem(item: BackendAIRecommendationItem): AIRecommend
     color: item.color ?? undefined,
   };
 }
+
+
