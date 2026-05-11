@@ -128,6 +128,10 @@ type BackendCallSession = {
   kind: "audio" | "video";
   state: "ringing" | "connecting" | "in_call" | "ended";
   peer: BackendUser;
+  offer?: RTCSessionDescriptionInit | null;
+  answer?: RTCSessionDescriptionInit | null;
+  caller_candidates?: RTCIceCandidateInit[];
+  receiver_candidates?: RTCIceCandidateInit[];
 };
 
 export class ApiError extends Error {
@@ -150,14 +154,22 @@ export class ApiDressMeClient implements DressMeClient {
     init?: RequestInit,
     token?: string,
   ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init?.headers,
-      },
-    });
+    const url = `${this.baseUrl}${path}`;
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...init?.headers,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Network request failed";
+      throw new ApiError(`Network request failed for ${url}: ${message}`);
+    }
 
     if (!response.ok) {
       let details: unknown;
@@ -289,11 +301,21 @@ export class ApiDressMeClient implements DressMeClient {
     return mapChatMessage(message);
   }
 
-  async startCall(peerId: string, kind: "audio" | "video", token?: string): Promise<CallSession> {
+  async startCall(
+    peerId: string,
+    kind: "audio" | "video",
+    token?: string,
+    offer?: RTCSessionDescriptionInit,
+  ): Promise<CallSession> {
     const session = await this.request<BackendCallSession>("/calls/start", {
       method: "POST",
-      body: JSON.stringify({ peer_id: peerId, kind }),
+      body: JSON.stringify({ peer_id: peerId, kind, offer }),
     }, token);
+    return mapCallSession(session);
+  }
+
+  async getCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(`/calls/${callId}`, undefined, token);
     return mapCallSession(session);
   }
 
@@ -302,10 +324,13 @@ export class ApiDressMeClient implements DressMeClient {
     return sessions.map(mapCallSession);
   }
 
-  async answerCall(callId: string, token?: string): Promise<CallSession> {
+  async answerCall(callId: string, token?: string, answer?: RTCSessionDescriptionInit): Promise<CallSession> {
     const session = await this.request<BackendCallSession>(
       `/calls/${callId}/answer`,
-      { method: "POST" },
+      {
+        method: "POST",
+        body: JSON.stringify({ answer }),
+      },
       token,
     );
     return mapCallSession(session);
@@ -315,6 +340,31 @@ export class ApiDressMeClient implements DressMeClient {
     const session = await this.request<BackendCallSession>(
       `/calls/${callId}/reject`,
       { method: "POST" },
+      token,
+    );
+    return mapCallSession(session);
+  }
+
+  async endCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/end`,
+      { method: "POST" },
+      token,
+    );
+    return mapCallSession(session);
+  }
+
+  async addIceCandidate(
+    callId: string,
+    candidate: RTCIceCandidateInit,
+    token?: string,
+  ): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/candidates`,
+      {
+        method: "POST",
+        body: JSON.stringify({ candidate }),
+      },
       token,
     );
     return mapCallSession(session);
@@ -462,5 +512,9 @@ function mapCallSession(session: BackendCallSession): CallSession {
     kind: session.kind,
     state: session.state,
     peer: mapUser(session.peer),
+    offer: session.offer ?? undefined,
+    answer: session.answer ?? undefined,
+    callerCandidates: session.caller_candidates ?? [],
+    receiverCandidates: session.receiver_candidates ?? [],
   };
 }

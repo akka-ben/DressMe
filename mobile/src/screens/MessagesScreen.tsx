@@ -13,6 +13,7 @@ import type { Conversation, User } from "../types/contracts";
 type ActiveCall = {
   id?: string;
   mode: CallMode;
+  direction: "outgoing" | "incoming";
   peer?: User;
   peerName: string;
 };
@@ -35,6 +36,7 @@ export function MessagesScreen() {
       setIncomingCall({
         id: firstCall.id,
         mode: firstCall.kind,
+        direction: "incoming",
         peer: firstCall.peer,
         peerName: `${firstCall.peer.firstName} ${firstCall.peer.lastName}`.trim() || firstCall.peer.email,
       });
@@ -47,18 +49,12 @@ export function MessagesScreen() {
     return () => clearInterval(interval);
   }, [pollIncomingCalls]);
 
-  const startOutgoingCall = async (mode: CallMode, peer?: User, peerName?: string) => {
-    if (!peer || !token) {
-      setActiveCall({ mode, peer, peerName: peerName ?? conversation?.title ?? "Contact" });
-      return;
-    }
-
-    const session = await client.startCall(peer.id, mode, token);
+  const startOutgoingCall = (mode: CallMode, peer?: User, peerName?: string) => {
     setActiveCall({
-      id: session.id,
-      mode: session.kind,
-      peer: session.peer,
-      peerName: `${session.peer.firstName} ${session.peer.lastName}`.trim() || session.peer.email,
+      mode,
+      direction: "outgoing",
+      peer,
+      peerName: peerName ?? conversation?.title ?? "Contact",
     });
   };
 
@@ -86,8 +82,14 @@ export function MessagesScreen() {
           {activeCall ? (
             <CallScreen
               mode={activeCall.mode}
+              direction={activeCall.direction}
+              token={token}
+              callId={activeCall.id}
               peer={activeCall.peer}
               peerName={activeCall.peerName}
+              onCallStarted={(callId) =>
+                setActiveCall((current) => current ? { ...current, id: callId } : current)
+              }
               onEndCall={() => setActiveCall(null)}
             />
           ) : null}
@@ -99,17 +101,7 @@ export function MessagesScreen() {
               peer={incomingCall.peer}
               peerName={incomingCall.peerName}
               onAccept={async () => {
-                if (incomingCall.id && token) {
-                  const session = await client.answerCall(incomingCall.id, token);
-                  setActiveCall({
-                    id: session.id,
-                    mode: session.kind,
-                    peer: session.peer,
-                    peerName: `${session.peer.firstName} ${session.peer.lastName}`.trim() || session.peer.email,
-                  });
-                } else {
-                  setActiveCall(incomingCall);
-                }
+                setActiveCall(incomingCall);
                 setIncomingCall(null);
               }}
               onReject={async () => {
@@ -138,17 +130,7 @@ export function MessagesScreen() {
             peer={incomingCall.peer}
             peerName={incomingCall.peerName}
             onAccept={async () => {
-              if (incomingCall.id && token) {
-                const session = await client.answerCall(incomingCall.id, token);
-                setActiveCall({
-                  id: session.id,
-                  mode: session.kind,
-                  peer: session.peer,
-                  peerName: `${session.peer.firstName} ${session.peer.lastName}`.trim() || session.peer.email,
-                });
-              } else {
-                setActiveCall(incomingCall);
-              }
+              setActiveCall(incomingCall);
               setIncomingCall(null);
             }}
             onReject={async () => {
@@ -164,8 +146,14 @@ export function MessagesScreen() {
         {activeCall ? (
           <CallScreen
             mode={activeCall.mode}
+            direction={activeCall.direction}
+            token={token}
+            callId={activeCall.id}
             peer={activeCall.peer}
             peerName={activeCall.peerName}
+            onCallStarted={(callId) =>
+              setActiveCall((current) => current ? { ...current, id: callId } : current)
+            }
             onEndCall={() => setActiveCall(null)}
           />
         ) : null}

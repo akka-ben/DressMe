@@ -4,24 +4,45 @@
     "slug": "dressme",
     "version": "1.0.0",
     "orientation": "portrait",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "infoPlist": {
-        "NSCameraUsageDescription": "DressMe utilise la camera pour envoyer des photos dans le chat.",
-        "NSMicrophoneUsageDescription": "DressMe utilise le micro pour enregistrer des messages vocaux.",
+        "NSCameraUsageDescription": "DressMe utilise la camera pour les appels video et l'envoi de photos.",
+        "NSMicrophoneUsageDescription": "DressMe utilise le micro pour les appels audio/video et les messages vocaux.",
         "NSPhotoLibraryUsageDescription": "DressMe utilise vos photos pour envoyer des images dans le chat."
-      }
+      },
+      "bitcode": false
     },
     "android": {
+      "usesCleartextTraffic": true,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
         "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE"
-      ]
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ],
+      "package": "com.anonymous.dressme"
     },
+    "plugins": [
+      "@config-plugins/react-native-webrtc"
+    ],
     "web": {
       "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9adf2184-926d-4de1-a600-cede3e0b411f"
+      }
     }
   }
 }

@@ -34,10 +34,18 @@ export interface DressMeClient {
     input: { body: string; kind?: "text" | "image" | "audio" },
     token?: string,
   ): Promise<Message>;
-  startCall(peerId: string, kind: "audio" | "video", token?: string): Promise<CallSession>;
+  startCall(
+    peerId: string,
+    kind: "audio" | "video",
+    token?: string,
+    offer?: RTCSessionDescriptionInit,
+  ): Promise<CallSession>;
+  getCall(callId: string, token?: string): Promise<CallSession>;
   getIncomingCalls(token?: string): Promise<CallSession[]>;
-  answerCall(callId: string, token?: string): Promise<CallSession>;
+  answerCall(callId: string, token?: string, answer?: RTCSessionDescriptionInit): Promise<CallSession>;
   rejectCall(callId: string, token?: string): Promise<CallSession>;
+  endCall(callId: string, token?: string): Promise<CallSession>;
+  addIceCandidate(callId: string, candidate: RTCIceCandidateInit, token?: string): Promise<CallSession>;
   helpMeChoose(input: {
     imageUrl: string;
     occasion?: string;

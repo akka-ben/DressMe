@@ -89,6 +89,10 @@ export class MockDressMeClient implements DressMeClient {
     throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
   }
 
+  async getCall(): Promise<CallSession> {
+    throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
+  }
+
   async getIncomingCalls() {
     return [];
   }
@@ -98,6 +102,14 @@ export class MockDressMeClient implements DressMeClient {
   }
 
   async rejectCall(): Promise<CallSession> {
+    throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
+  }
+
+  async endCall(): Promise<CallSession> {
+    throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
+  }
+
+  async addIceCandidate(): Promise<CallSession> {
     throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
   }
 

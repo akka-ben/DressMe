@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -126,8 +126,21 @@ class CallSessionDTO(BaseModel):
     kind: Literal["audio", "video"]
     state: Literal["ringing", "connecting", "in_call", "ended"]
     peer: UserDTO
+    offer: dict[str, Any] | None = None
+    answer: dict[str, Any] | None = None
+    caller_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    receiver_candidates: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class StartCallInput(BaseModel):
     peer_id: str = Field(..., min_length=1, max_length=100)
     kind: Literal["audio", "video"] = "audio"
+    offer: dict[str, Any] | None = None
+
+
+class AnswerCallInput(BaseModel):
+    answer: dict[str, Any] | None = None
+
+
+class IceCandidateInput(BaseModel):
+    candidate: dict[str, Any]

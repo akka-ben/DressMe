@@ -69,6 +69,10 @@ export type CallSession = {
   kind: "audio" | "video";
   state: "ringing" | "connecting" | "in_call" | "ended";
   peer: User;
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  callerCandidates: RTCIceCandidateInit[];
+  receiverCandidates: RTCIceCandidateInit[];
 };
 
 export type AIRecommendationItem = {

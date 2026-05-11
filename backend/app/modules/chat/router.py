@@ -84,6 +84,18 @@ def _conversation_for_user(conversation: ConversationDTO, current_user_id: str) 
     )
 
 
+def _conversation_preview(current_user: UserDTO, peer: UserDTO) -> ConversationDTO:
+    conversation_id = _conversation_id(current_user.id, peer.id)
+    messages = messages_by_conversation.get(conversation_id, [])
+    return ConversationDTO(
+        id=conversation_id,
+        title=peer.first_name,
+        participants=[current_user, peer],
+        last_message=messages[-1] if messages else None,
+        unread_count=0,
+    )
+
+
 async def _available_users(
     db: AsyncIOMotorDatabase,
     current_user: UserDocument,
@@ -118,6 +130,7 @@ async def _find_user(
 @router.get("/conversations", response_model=list[ConversationDTO])
 async def conversations(
     current_user: UserDocument = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db),
 ) -> list[ConversationDTO]:
     current_user_id = str(current_user["id"])
     visible = [
@@ -128,6 +141,14 @@ async def conversations(
 
     if visible:
         return visible
+
+    current_user_dto = _user_to_dto(current_user)
+    registered_users = [
+        _user_to_dto(document)
+        for document in await db.users.find({"_id": {"$ne": current_user_id}}).to_list(50)
+    ]
+    if registered_users:
+        return [_conversation_preview(current_user_dto, peer) for peer in registered_users]
 
     amine = _fallback_users()[0]
     demo_message = MessageDTO(
