@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   Bookmark,
   CheckCircle2,
   Grid3X3,
+  LogOut,
   Settings,
   Tag,
   Video,
@@ -32,7 +34,7 @@ type Props = {
 };
 
 export function ProfileScreen({ onOpenPost, onEditProfile, onOpenFollowers, onOpenFollowing }: Props) {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
 
   const [active, setActive] = useState<ProfileTab>("posts");
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -100,15 +102,43 @@ export function ProfileScreen({ onOpenPost, onEditProfile, onOpenFollowers, onOp
   const isGridLoading =
     loading || (loadingSaved && (active === "saved" || active === "videos"));
 
+  const handleLogout = useCallback(() => {
+    Alert.alert("Deconnexion", "Voulez-vous vraiment vous deconnecter ?", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Se deconnecter",
+        style: "destructive",
+        onPress: () => void logout(),
+      },
+    ]);
+  }, [logout]);
+
   // ── Rendu ─────────────────────────────────────────────────────────────────
   return (
     <View style={styles.shell}>
       {/* En-tête */}
       <View style={styles.header}>
         <Text style={styles.username}>@{username}</Text>
-        <Pressable onPress={onEditProfile}>
-          <Settings size={22} color={colors.burgundy} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityLabel="Modifier les parametres du profil"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onEditProfile}
+            style={styles.headerIconButton}
+          >
+            <Settings size={21} color={colors.burgundy} />
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Se deconnecter"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={handleLogout}
+            style={[styles.headerIconButton, styles.logoutButton]}
+          >
+            <LogOut size={20} color={colors.burgundy} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Carte profil */}
@@ -303,6 +333,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  logoutButton: {
+    borderColor: "rgba(122, 31, 48, 0.28)",
+    backgroundColor: colors.cream,
   },
   username: {
     fontFamily: fonts.display,

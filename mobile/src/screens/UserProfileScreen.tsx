@@ -39,7 +39,6 @@ export function UserProfileScreen({
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("posts");
   const [suggestions, setSuggestions] = useState<User[]>([]);
 
@@ -48,7 +47,7 @@ export function UserProfileScreen({
     setLoading(true);
     try {
       const [profileData, postsData, suggestionsData] = await Promise.all([
-        client.getProfile(userId),
+        client.getProfile(userId, { token: token ?? undefined }),
         client.getUserPosts(userId, token ?? undefined),
         client.getSuggestions(userId, token ?? undefined),
       ]);
@@ -69,23 +68,18 @@ export function UserProfileScreen({
 
   // ── Follow / Unfollow ────────────────────────────────────────────────────
   const toggleFollow = async () => {
-    if (!token) return;
+    if (!token || !profile || profile.followStatus === "self") return;
     setFollowLoading(true);
     try {
-      if (isFollowing) {
-        await client.unfollowUser(userId, token);
-        setIsFollowing(false);
-        setProfile((prev) =>
-          prev
-            ? { ...prev, followerCount: Math.max(0, prev.followerCount - 1) }
-            : prev
-        );
+      const shouldUnfollow =
+        profile.followStatus === "following" || profile.followStatus === "requested";
+
+      if (shouldUnfollow) {
+        const updatedProfile = await client.unfollowUser(userId, token);
+        setProfile(updatedProfile);
       } else {
-        await client.followUser(userId, token);
-        setIsFollowing(true);
-        setProfile((prev) =>
-          prev ? { ...prev, followerCount: prev.followerCount + 1 } : prev
-        );
+        const updatedProfile = await client.followUser(userId, token);
+        setProfile(updatedProfile);
       }
     } catch (e) {
       console.warn("Erreur follow/unfollow:", e);
@@ -101,6 +95,17 @@ export function UserProfileScreen({
       : posts.filter((p) => p.mediaType === "image");
 
   const isOwnProfile = me?.id === userId;
+  const followStatus = profile?.followStatus ?? "not_following";
+  const isFollowing = followStatus === "following";
+  const isRequested = followStatus === "requested";
+  const isFollowActive = isFollowing || isRequested;
+  const followLabel = isFollowing
+    ? "Abonné"
+    : isRequested
+      ? "Demande envoyée"
+      : profile?.isPrivate
+        ? "Demander"
+        : "S'abonner";
 
   // ── Affichage ────────────────────────────────────────────────────────────
   const displayName =
@@ -199,27 +204,27 @@ export function UserProfileScreen({
                 <Pressable
                   style={[
                     styles.followBtn,
-                    isFollowing && styles.followBtnActive,
+                    isFollowActive && styles.followBtnActive,
                   ]}
                   onPress={toggleFollow}
                   disabled={followLoading}
                 >
                   {followLoading ? (
                     <ActivityIndicator
-                      color={isFollowing ? colors.burgundy : colors.white}
+                      color={isFollowActive ? colors.burgundy : colors.white}
                       size="small"
                     />
-                  ) : isFollowing ? (
+                  ) : isFollowActive ? (
                     <>
                       <UserCheck size={16} color={colors.burgundy} />
                       <Text style={[styles.followBtnText, { color: colors.burgundy }]}>
-                        Abonné
+                        {followLabel}
                       </Text>
                     </>
                   ) : (
                     <>
                       <UserPlus size={16} color={colors.white} />
-                      <Text style={styles.followBtnText}>S'abonner</Text>
+                      <Text style={styles.followBtnText}>{followLabel}</Text>
                     </>
                   )}
                 </Pressable>

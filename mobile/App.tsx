@@ -61,7 +61,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated, isLoading, logout, user, token } = useAuth();
+  const { isAuthenticated, isLoading, token } = useAuth();
   const [authRoute, setAuthRoute] = useState<AuthRoute>("onboarding");
   const [activeTab, setActiveTab] = useState<AppTab>("feed");
   const [lastRegisteredEmail, setLastRegisteredEmail] = useState("");
@@ -198,17 +198,19 @@ function AppShell() {
       return <PostDetailScreen postId={selectedPostId} onBack={() => setSelectedPostId(null)} />;
     }
 
+    if (viewingUserId) {
+      return (
+        <UserProfileScreen
+          userId={viewingUserId}
+          onBack={() => setViewingUserId(null)}
+          onOpenPost={setSelectedPostId}
+          onOpenProfile={(userId) => setViewingUserId(userId)}
+        />
+      );
+    }
+
     switch (activeTab) {
       case "feed":
-        if (viewingUserId) {
-          return (
-            <UserProfileScreen
-              userId={viewingUserId}
-              onBack={() => setViewingUserId(null)}
-              onOpenPost={setSelectedPostId}
-            />
-          );
-        }
         return (
           <HomeFeedScreen
             onOpenPost={setSelectedPostId}
@@ -299,19 +301,6 @@ function AppShell() {
             </View>
           ) : (
             <>
-              {isAuthenticated && !showCreatePost && !liveRoute ? (
-                <Pressable
-                  accessibilityRole="button"
-                  hitSlop={8}
-                  onPress={() => void logout()}
-                  style={styles.logout}
-                >
-                  <Text style={styles.logoutText}>
-                    Logout{user?.firstName ? ` · ${user.firstName}` : ""}
-                  </Text>
-                </Pressable>
-              ) : null}
-
               {isLoading ? (
                 <View style={[styles.screen, styles.loadingState]}>
                   <ActivityIndicator color={colors.burgundy} />
@@ -429,21 +418,6 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingTop: APP_TOP_INSET + 18,
     paddingBottom: 20,
-  },
-  logout: {
-    position: "absolute",
-    top: APP_TOP_INSET + 10,
-    right: 18,
-    zIndex: 12,
-    backgroundColor: "rgba(255,255,255,0.88)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  logoutText: {
-    color: colors.burgundy,
-    fontSize: 11,
-    fontWeight: "800",
   },
   loadingState: {
     minHeight: 160,
