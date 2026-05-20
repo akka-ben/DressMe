@@ -5,9 +5,12 @@ import type {
   ActivityNotification,
   AuthMessage,
   AuthSession,
+  CallSession,
   Comment,
+  Conversation,
   LiveSession,
   MediaUpload,
+  Message,
   Poll,
   PollOption,
   Post,
@@ -192,6 +195,34 @@ type BackendSearchResults = {
   videos: BackendPost[];
   places: BackendSearchPlace[];
   top_posts: BackendPost[];
+};
+
+type BackendChatMessage = {
+  id: string;
+  conversation_id: string;
+  kind: "text" | "image" | "audio" | "shared_post" | "shared_ai_look";
+  body: string;
+  sender: BackendUser;
+  created_at: string;
+};
+
+type BackendConversation = {
+  id: string;
+  title: string;
+  participants: BackendUser[];
+  last_message?: BackendChatMessage | null;
+  unread_count?: number;
+};
+
+type BackendCallSession = {
+  id: string;
+  kind: "audio" | "video";
+  state: "ringing" | "connecting" | "in_call" | "ended";
+  peer: BackendUser;
+  offer?: RTCSessionDescriptionInit | null;
+  answer?: RTCSessionDescriptionInit | null;
+  caller_candidates?: RTCIceCandidateInit[];
+  receiver_candidates?: RTCIceCandidateInit[];
 };
 
 export class ApiError extends Error {
@@ -580,7 +611,8 @@ export class ApiDressMeClient implements DressMeClient {
 
   async pingOnline(token: string): Promise<void> {
     await this.request<{ status: string }>("/users/me/ping", undefined, token);
-}
+  }
+
   async getPost(postId: string, input?: { token?: string }): Promise<Post> {
     const post = await this.request<BackendPost>(
       `/posts/${postId}`,
@@ -800,6 +832,121 @@ export class ApiDressMeClient implements DressMeClient {
       token,
     );
     return mapProfile(profile);
+  }
+
+  async getChatUsers(token?: string): Promise<User[]> {
+    const users = await this.request<BackendUser[]>("/chat/users", undefined, token);
+    return users.map(mapUser);
+  }
+
+  async getConversations(token?: string): Promise<Conversation[]> {
+    const conversations = await this.request<BackendConversation[]>("/chat/conversations", undefined, token);
+    return conversations.map(mapConversation);
+  }
+
+  async startConversation(userId: string, token?: string): Promise<Conversation> {
+    const conversation = await this.request<BackendConversation>("/chat/conversations", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId }),
+    }, token);
+    return mapConversation(conversation);
+  }
+
+  async getConversationMessages(conversationId: string, token?: string): Promise<Message[]> {
+    const messages = await this.request<BackendChatMessage[]>(
+      `/chat/conversations/${conversationId}/messages`,
+      undefined,
+      token,
+    );
+    return messages.map(mapChatMessage);
+  }
+
+  async sendConversationMessage(
+    conversationId: string,
+    input: { body: string; kind?: "text" | "image" | "audio" },
+    token?: string,
+  ): Promise<Message> {
+    const message = await this.request<BackendChatMessage>(
+      `/chat/conversations/${conversationId}/messages`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          body: input.body,
+          kind: input.kind ?? "text",
+        }),
+      },
+      token,
+    );
+    return mapChatMessage(message);
+  }
+
+  async startCall(
+    peerId: string,
+    kind: "audio" | "video",
+    token?: string,
+    offer?: RTCSessionDescriptionInit,
+  ): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>("/calls/start", {
+      method: "POST",
+      body: JSON.stringify({ peer_id: peerId, kind, offer }),
+    }, token);
+    return mapCallSession(session);
+  }
+
+  async getCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(`/calls/${callId}`, undefined, token);
+    return mapCallSession(session);
+  }
+
+  async getIncomingCalls(token?: string): Promise<CallSession[]> {
+    const sessions = await this.request<BackendCallSession[]>("/calls/incoming", undefined, token);
+    return sessions.map(mapCallSession);
+  }
+
+  async answerCall(callId: string, token?: string, answer?: RTCSessionDescriptionInit): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/answer`,
+      {
+        method: "POST",
+        body: JSON.stringify({ answer }),
+      },
+      token,
+    );
+    return mapCallSession(session);
+  }
+
+  async rejectCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/reject`,
+      { method: "POST" },
+      token,
+    );
+    return mapCallSession(session);
+  }
+
+  async endCall(callId: string, token?: string): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/end`,
+      { method: "POST" },
+      token,
+    );
+    return mapCallSession(session);
+  }
+
+  async addIceCandidate(
+    callId: string,
+    candidate: RTCIceCandidateInit,
+    token?: string,
+  ): Promise<CallSession> {
+    const session = await this.request<BackendCallSession>(
+      `/calls/${callId}/candidates`,
+      {
+        method: "POST",
+        body: JSON.stringify({ candidate }),
+      },
+      token,
+    );
+    return mapCallSession(session);
   }
 
   async helpMeChoose(input: {
@@ -1073,5 +1220,39 @@ function mapAIRecommendationItem(item: BackendAIRecommendationItem): AIRecommend
     category: item.category,
     description: item.description,
     color: item.color ?? undefined,
+  };
+}
+
+function mapChatMessage(message: BackendChatMessage): Message {
+  return {
+    id: message.id,
+    conversationId: message.conversation_id,
+    sender: mapUser(message.sender),
+    kind: message.kind,
+    body: message.body,
+    createdAt: message.created_at,
+  };
+}
+
+function mapConversation(conversation: BackendConversation): Conversation {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    participants: conversation.participants.map(mapUser),
+    lastMessage: conversation.last_message ? mapChatMessage(conversation.last_message) : undefined,
+    unreadCount: conversation.unread_count ?? 0,
+  };
+}
+
+function mapCallSession(session: BackendCallSession): CallSession {
+  return {
+    id: session.id,
+    kind: session.kind,
+    state: session.state,
+    peer: mapUser(session.peer),
+    offer: session.offer ?? undefined,
+    answer: session.answer ?? undefined,
+    callerCandidates: session.caller_candidates ?? [],
+    receiverCandidates: session.receiver_candidates ?? [],
   };
 }

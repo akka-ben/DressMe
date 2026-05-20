@@ -2,40 +2,77 @@
   "expo": {
     "name": "DressMe",
     "slug": "dressme",
+    "scheme": "dressme",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./ios/DressMe/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
-    "web": {
-      "bundler": "metro"
-    },
     "ios": {
       "bundleIdentifier": "com.mohammedbenakkaouayad.dressme",
-      "icon": "./ios/DressMe/Images.xcassets/AppIcon.appiconset/App-Icon-1024x1024@1x.png",
+      "icon": "./assets/icon.png",
+      "bitcode": false,
       "infoPlist": {
-        "NSCameraUsageDescription": "DressMe utilise votre camera pour capturer des tenues, reels et stories.",
-        "NSMicrophoneUsageDescription": "DressMe utilise votre micro pour enregistrer le son des reels.",
-        "NSPhotoLibraryUsageDescription": "DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier."
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        },
+        "NSBonjourServices": [
+          "_expo._tcp",
+          "_exponent._tcp",
+          "_packager._tcp",
+          "_http._tcp"
+        ],
+        "NSCameraUsageDescription": "DressMe utilise votre camera pour capturer des tenues, reels, stories, appels video et photos de chat.",
+        "NSLocalNetworkUsageDescription": "DressMe se connecte au backend et au serveur Expo sur votre reseau local.",
+        "NSMicrophoneUsageDescription": "DressMe utilise votre micro pour enregistrer le son des reels, stories, appels audio/video et messages vocaux.",
+        "NSPhotoLibraryUsageDescription": "DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier ou a envoyer dans le chat."
       }
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ],
+      "package": "com.dressme"
     },
     "plugins": [
       [
         "expo-image-picker",
         {
-          "photosPermission": "DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier."
+          "photosPermission": "DressMe utilise votre galerie pour choisir des photos et videos de tenues a publier ou a envoyer dans le chat."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "DressMe utilise votre camera pour capturer des tenues, reels et stories.",
-          "microphonePermission": "DressMe utilise votre micro pour enregistrer le son des reels.",
+          "cameraPermission": "DressMe utilise votre camera pour capturer des tenues, reels, stories, appels video et photos de chat.",
+          "microphonePermission": "DressMe utilise votre micro pour enregistrer le son des reels, stories, appels audio/video et messages vocaux.",
           "recordAudioAndroid": true
         }
       ],
+      "@config-plugins/react-native-webrtc",
       "expo-video"
-    ]
+    ],
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9adf2184-926d-4de1-a600-cede3e0b411f"
+      }
+    }
   }
 }

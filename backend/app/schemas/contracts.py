@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -226,10 +226,19 @@ class HelpMeChooseInput(BaseModel):
 class MessageDTO(BaseModel):
     id: str
     conversation_id: str
-    kind: Literal["text", "image", "shared_post", "shared_ai_look"]
+    kind: Literal["text", "image", "audio", "shared_post", "shared_ai_look"]
     body: str
     sender: UserDTO
     created_at: datetime
+
+
+class SendMessageInput(BaseModel):
+    kind: Literal["text", "image", "audio"] = "text"
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
+class StartConversationInput(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=100)
 
 
 class ConversationDTO(BaseModel):
@@ -237,6 +246,7 @@ class ConversationDTO(BaseModel):
     title: str
     participants: list[UserDTO]
     last_message: MessageDTO | None = None
+    unread_count: int = 0
 
 
 class CallSessionDTO(BaseModel):
@@ -244,3 +254,21 @@ class CallSessionDTO(BaseModel):
     kind: Literal["audio", "video"]
     state: Literal["ringing", "connecting", "in_call", "ended"]
     peer: UserDTO
+    offer: dict[str, Any] | None = None
+    answer: dict[str, Any] | None = None
+    caller_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    receiver_candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class StartCallInput(BaseModel):
+    peer_id: str = Field(..., min_length=1, max_length=100)
+    kind: Literal["audio", "video"] = "audio"
+    offer: dict[str, Any] | None = None
+
+
+class AnswerCallInput(BaseModel):
+    answer: dict[str, Any] | None = None
+
+
+class IceCandidateInput(BaseModel):
+    candidate: dict[str, Any]

@@ -3,9 +3,12 @@ import type {
   ActivityNotification,
   AuthMessage,
   AuthSession,
+  CallSession,
   Comment,
+  Conversation,
   LiveSession,
   MediaUpload,
+  Message,
   Post,
   PostStats,
   Profile,
@@ -69,6 +72,27 @@ export interface DressMeClient {
   getProfilePosts(input: { userId: string; token?: string; limit?: number; offset?: number }): Promise<Post[]>;
   followUser(userId: string, token: string): Promise<Profile>;
   unfollowUser(userId: string, token: string): Promise<Profile>;
+  getChatUsers(token?: string): Promise<User[]>;
+  getConversations(token?: string): Promise<Conversation[]>;
+  startConversation(userId: string, token?: string): Promise<Conversation>;
+  getConversationMessages(conversationId: string, token?: string): Promise<Message[]>;
+  sendConversationMessage(
+    conversationId: string,
+    input: { body: string; kind?: "text" | "image" | "audio" },
+    token?: string,
+  ): Promise<Message>;
+  startCall(
+    peerId: string,
+    kind: "audio" | "video",
+    token?: string,
+    offer?: RTCSessionDescriptionInit,
+  ): Promise<CallSession>;
+  getCall(callId: string, token?: string): Promise<CallSession>;
+  getIncomingCalls(token?: string): Promise<CallSession[]>;
+  answerCall(callId: string, token?: string, answer?: RTCSessionDescriptionInit): Promise<CallSession>;
+  rejectCall(callId: string, token?: string): Promise<CallSession>;
+  endCall(callId: string, token?: string): Promise<CallSession>;
+  addIceCandidate(callId: string, candidate: RTCIceCandidateInit, token?: string): Promise<CallSession>;
   helpMeChoose(input: {
     imageUrl: string;
     occasion?: string;

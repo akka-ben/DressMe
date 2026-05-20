@@ -1,4 +1,4 @@
-import type { AIRecommendation, Comment, Post, Profile, User } from "../../types/contracts";
+import type { AIRecommendation, Comment, Conversation, Message, Post, Profile, User } from "../../types/contracts";
 
 const demoUser: User = {
   id: "u-1",
@@ -70,6 +70,33 @@ export const mockComments: Comment[] = [
     },
     content: "Tenue B is cleaner. Keep the shoes from look A.",
     createdAt: new Date().toISOString(),
+  },
+];
+
+export const mockMessages: Message[] = [
+  {
+    id: "m-1",
+    conversationId: "conv-1",
+    sender: {
+      id: "u-2",
+      firstName: "Amine",
+      lastName: "El Meskini",
+      email: "amine@example.com",
+      avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
+    },
+    kind: "text",
+    body: "Send me the final look before you post it.",
+    createdAt: new Date().toISOString(),
+  },
+];
+
+export const mockConversations: Conversation[] = [
+  {
+    id: "conv-1",
+    title: "Amine",
+    participants: [demoUser, mockMessages[0].sender],
+    lastMessage: mockMessages[0],
+    unreadCount: 3,
   },
 ];
 

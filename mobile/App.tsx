@@ -297,7 +297,6 @@ function AppShell() {
           {showSplash ? (
             <View style={styles.splash}>
               <Image source={splashGif} style={styles.splashImage} />
-              <Text style={styles.splashLogo}>DressMe</Text>
             </View>
           ) : (
             <>
@@ -386,19 +385,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
-    gap: 22,
   },
   splashImage: {
-    width: 210,
-    height: 210,
+    width: "86%",
+    height: "86%",
     resizeMode: "contain",
-  },
-  splashLogo: {
-    fontFamily: fonts.display,
-    color: colors.gold,
-    fontSize: 46,
-    fontWeight: "700",
-    letterSpacing: 1,
   },
   screen: {
     flex: 1,
