@@ -10,19 +10,20 @@ export type AppTab = "feed" | "search" | "reels" | "messages" | "profile";
 type Props = {
   activeTab: AppTab;
   onChange: (tab: AppTab) => void;
+  messageBadgeCount?: number;
 };
 
 
-const tabs: Array<{ key: AppTab; label: string; Icon: typeof Home; badge?: number }> = [
+const tabs: Array<{ key: AppTab; label: string; Icon: typeof Home }> = [
   { key: "feed", label: "Feed", Icon: Home },
   { key: "search", label: "Recherche", Icon: Search },
   { key: "reels", label: "Reels", Icon: Video },
-  { key: "messages", label: "Messages", Icon: Send, badge: 3 },
+  { key: "messages", label: "Messages", Icon: Send },
   { key: "profile", label: "Profil", Icon: User },
 ];
 
 
-export function TabBar({ activeTab, onChange }: Props) {
+export function TabBar({ activeTab, onChange, messageBadgeCount = 0 }: Props) {
   return (
     <View style={styles.container}>
       {tabs.map((tab) => {
@@ -37,7 +38,9 @@ export function TabBar({ activeTab, onChange }: Props) {
           >
             <View>
               <Icon size={21} strokeWidth={2.1} color={active ? colors.burgundy : colors.muted} />
-              {tab.badge ? <View style={styles.badge} /> : null}
+              {tab.key === "messages" && messageBadgeCount > 0 ? (
+                <Text style={styles.badge}>{messageBadgeCount > 99 ? "99+" : messageBadgeCount}</Text>
+              ) : null}
             </View>
             <Text style={[styles.label, active && styles.activeLabel]}>{tab.label}</Text>
           </Pressable>
@@ -86,13 +89,20 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: "absolute",
-    top: -3,
-    right: -6,
-    width: 9,
-    height: 9,
-    borderRadius: 999,
+    top: -8,
+    right: -13,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: colors.burgundy,
     borderWidth: 1,
     borderColor: colors.white,
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 4,
+    paddingTop: 1,
+    textAlign: "center",
   },
 });

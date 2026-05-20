@@ -1,9 +1,10 @@
 import Constants from "expo-constants";
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StatusBar,
@@ -27,13 +28,15 @@ import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { ResetPasswordScreen } from "./src/screens/ResetPasswordScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { MessagesScreen } from "./src/screens/MessagesScreen";
+import { IncomingCallScreen } from "./src/screens/IncomingCallScreen";
 import { colors, fonts } from "./src/theme/dressme";
 import { EditProfileScreen } from "./src/screens/EditProfileScreen";
 import { UserProfileScreen } from "./src/screens/UserProfileScreen";
 import { FollowersScreen } from "./src/screens/FollowersScreen";
 import { ChangePasswordScreen } from "./src/screens/ChangePasswordScreen";
 import { client } from "./src/services";
-import type { LiveSession } from "./src/types/contracts";
+import type { CallMode } from "./src/types/calls";
+import type { LiveSession, User } from "./src/types/contracts";
 
 const splashGif = require("./assets/dressme-splash.gif");
 const IS_EXPO_GO = Constants.appOwnership === "expo";
@@ -48,9 +51,21 @@ const LazyLiveViewerScreen = React.lazy(() =>
     default: module.LiveViewerScreen,
   })),
 );
+const LazyCallScreen = React.lazy(() =>
+  import("./src/screens/CallScreen").then((module) => ({
+    default: module.CallScreen,
+  })),
+);
 
 type AuthRoute = "onboarding" | "login" | "register" | "forgot" | "reset";
 type LiveRoute = { role: "host" } | { role: "viewer"; session: LiveSession };
+type ActiveCall = {
+  id?: string;
+  mode: CallMode;
+  direction: "outgoing" | "incoming";
+  peer?: User;
+  peerName: string;
+};
 
 export default function App() {
   return (
@@ -77,6 +92,10 @@ function AppShell() {
     userId: string;
     mode: "followers" | "following";
   } | null>(null);
+  const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const [incomingCall, setIncomingCall] = useState<ActiveCall | null>(null);
+  const [messageBadgeCount, setMessageBadgeCount] = useState(0);
+  const [messagesDetailOpen, setMessagesDetailOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 3500);
@@ -105,6 +124,62 @@ function AppShell() {
     }, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, [token]);
+
+  const refreshMessageBadge = useCallback(async () => {
+    if (!token) {
+      setMessageBadgeCount(0);
+      return;
+    }
+
+    const conversations = await client.getConversations(token);
+    setMessageBadgeCount(
+      conversations.reduce((total, conversation) => total + conversation.unreadCount, 0),
+    );
+  }, [token]);
+
+  const pollIncomingCalls = useCallback(async () => {
+    if (!token || activeCall || incomingCall) {
+      return;
+    }
+
+    const calls = await client.getIncomingCalls(token);
+    const firstCall = calls[0];
+    if (firstCall) {
+      setIncomingCall({
+        id: firstCall.id,
+        mode: firstCall.kind,
+        direction: "incoming",
+        peer: firstCall.peer,
+        peerName: `${firstCall.peer.firstName} ${firstCall.peer.lastName}`.trim() || firstCall.peer.email,
+      });
+    }
+  }, [activeCall, incomingCall, token]);
+
+  useEffect(() => {
+    if (!isAuthenticated || authRoute === "reset") {
+      setIncomingCall(null);
+      setActiveCall(null);
+      setMessageBadgeCount(0);
+      return;
+    }
+
+    void pollIncomingCalls().catch(() => undefined);
+    void refreshMessageBadge().catch(() => undefined);
+    const interval = setInterval(() => {
+      void pollIncomingCalls().catch(() => undefined);
+      void refreshMessageBadge().catch(() => undefined);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [authRoute, isAuthenticated, pollIncomingCalls, refreshMessageBadge]);
+
+  const startCall = (mode: CallMode, peer?: User, peerName?: string) => {
+    setActiveCall({
+      mode,
+      direction: "outgoing",
+      peer,
+      peerName: peerName ?? "Contact",
+    });
+  };
 
   const renderAuth = () => {
     switch (authRoute) {
@@ -233,7 +308,13 @@ function AppShell() {
         return <ReelsScreen onOpenPost={setSelectedPostId} />;
 
       case "messages":
-        return <MessagesScreen />;
+        return (
+          <MessagesScreen
+            onStartCall={startCall}
+            onConversationRead={() => void refreshMessageBadge().catch(() => undefined)}
+            onConversationStateChange={setMessagesDetailOpen}
+          />
+        );
 
       case "profile":
         if (showChangePassword) {
@@ -286,6 +367,7 @@ function AppShell() {
     setShowChangePassword(false);
     setViewingUserId(null);
     setFollowersState(null);
+    setMessagesDetailOpen(false);
     setActiveTab(tab);
   };
 
@@ -305,7 +387,14 @@ function AppShell() {
                   <ActivityIndicator color={colors.burgundy} />
                 </View>
               ) : isAuthenticated && authRoute !== "reset" ? (
-                <View style={styles.tabScreen}>{renderTab()}</View>
+                <View
+                  style={[
+                    styles.tabScreen,
+                    activeTab === "messages" && messagesDetailOpen && styles.tabScreenFull,
+                  ]}
+                >
+                  {renderTab()}
+                </View>
               ) : (
                 <ScrollView
                   style={styles.screen}
@@ -318,13 +407,102 @@ function AppShell() {
                 </ScrollView>
               )}
 
-              {isAuthenticated && authRoute !== "reset" && !showCreatePost && !liveRoute ? (
-                <TabBar activeTab={activeTab} onChange={changeTab} />
+              {isAuthenticated &&
+              authRoute !== "reset" &&
+              !showCreatePost &&
+              !liveRoute &&
+              !(activeTab === "messages" && messagesDetailOpen) ? (
+                <TabBar
+                  activeTab={activeTab}
+                  onChange={changeTab}
+                  messageBadgeCount={messageBadgeCount}
+                />
+              ) : null}
+              {isAuthenticated && authRoute !== "reset" ? (
+                <>
+                  <Modal visible={Boolean(incomingCall)} animationType="fade">
+                    {incomingCall ? (
+                      <IncomingCallScreen
+                        mode={incomingCall.mode}
+                        peer={incomingCall.peer}
+                        peerName={incomingCall.peerName}
+                        onAccept={async () => {
+                          setActiveCall(incomingCall);
+                          setIncomingCall(null);
+                        }}
+                        onReject={async () => {
+                          if (incomingCall.id && token) {
+                            await client.rejectCall(incomingCall.id, token);
+                          }
+                          setIncomingCall(null);
+                        }}
+                      />
+                    ) : null}
+                  </Modal>
+                  <Modal visible={Boolean(activeCall)} animationType="fade">
+                    {activeCall ? (
+                      <CallModalContent
+                        activeCall={activeCall}
+                        token={token}
+                        onCallStarted={(callId) =>
+                          setActiveCall((current) => current ? { ...current, id: callId } : current)
+                        }
+                        onEndCall={() => setActiveCall(null)}
+                      />
+                    ) : null}
+                  </Modal>
+                </>
               ) : null}
             </>
           )}
         </View>
       </LinearGradient>
+    </View>
+  );
+}
+
+function CallModalContent({
+  activeCall,
+  token,
+  onCallStarted,
+  onEndCall,
+}: {
+  activeCall: ActiveCall;
+  token?: string | null;
+  onCallStarted: (callId: string) => void;
+  onEndCall: () => void;
+}) {
+  if (IS_EXPO_GO) {
+    return <CallUnavailableScreen onClose={onEndCall} />;
+  }
+
+  return (
+    <Suspense fallback={<LiveLoadingState />}>
+      <LazyCallScreen
+        mode={activeCall.mode}
+        direction={activeCall.direction}
+        token={token}
+        callId={activeCall.id}
+        peer={activeCall.peer}
+        peerName={activeCall.peerName}
+        onCallStarted={onCallStarted}
+        onEndCall={onEndCall}
+      />
+    </Suspense>
+  );
+}
+
+function CallUnavailableScreen({ onClose }: { onClose: () => void }) {
+  return (
+    <View style={styles.liveUnavailable}>
+      <Text style={styles.liveUnavailableTitle}>Appels indisponibles dans Expo Go</Text>
+      <Text style={styles.liveUnavailableText}>
+        Les appels utilisent WebRTC natif. Utilise le dev build sur telephone reel pour tester
+        l'audio/video.
+      </Text>
+      <Pressable accessibilityRole="button" onPress={onClose} style={styles.liveUnavailableButton}>
+        <Text style={styles.liveUnavailableButtonText}>Retour</Text>
+      </Pressable>
     </View>
   );
 }
@@ -403,6 +581,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingTop: APP_TOP_INSET,
     paddingBottom: 76,
+  },
+  tabScreenFull: {
+    paddingBottom: 0,
   },
   screenContent: {
     flexGrow: 1,

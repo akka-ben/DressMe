@@ -55,6 +55,8 @@ export function ChatListScreen({ onOpenConversation, onCreateConversation }: Pro
 
   useEffect(() => {
     void loadConversations();
+    const interval = setInterval(() => void loadConversations(), 3000);
+    return () => clearInterval(interval);
   }, [loadConversations]);
 
   if (loading) {
@@ -112,7 +114,7 @@ export function ChatListScreen({ onOpenConversation, onCreateConversation }: Pro
             onRefresh={() => void loadConversations(true)}
           />
         }
-        scrollEnabled={false}
+        scrollEnabled
       />
     </View>
   );

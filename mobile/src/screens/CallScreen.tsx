@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Audio } from "expo-av";
 import {
   mediaDevices,
   RTCIceCandidate,
@@ -285,11 +286,25 @@ export function CallScreen({
   }, [cameraOff, localStream]);
 
   useEffect(() => {
+    void Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      playThroughEarpieceAndroid: !speakerOn,
+      staysActiveInBackground: false,
+    }).catch(() => undefined);
+  }, [speakerOn]);
+
+  useEffect(() => {
     return () => {
       mountedRef.current = false;
       localStreamRef.current?.getTracks().forEach((track) => track.stop());
       remoteStreamRef.current?.getTracks().forEach((track) => track.stop());
       pcRef.current?.close();
+      void Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+      }).catch(() => undefined);
     };
   }, []);
 
