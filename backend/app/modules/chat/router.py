@@ -19,6 +19,7 @@ from app.schemas.contracts import (
 router = APIRouter()
 messages_by_conversation: dict[str, list[MessageDTO]] = {}
 conversations_by_id: dict[str, ConversationDTO] = {}
+unread_by_conversation: dict[str, dict[str, int]] = {}
 
 
 def _user_name_part(value: Any, fallback: str) -> str:
@@ -80,19 +81,29 @@ def _conversation_for_user(conversation: ConversationDTO, current_user_id: str) 
         update={
             "title": peer.first_name,
             "last_message": last_message,
+            "unread_count": unread_by_conversation.get(conversation.id, {}).get(current_user_id, 0),
         },
     )
 
 
 def _conversation_preview(current_user: UserDTO, peer: UserDTO) -> ConversationDTO:
     conversation_id = _conversation_id(current_user.id, peer.id)
+    if conversation_id not in conversations_by_id:
+        conversations_by_id[conversation_id] = ConversationDTO(
+            id=conversation_id,
+            title=peer.first_name,
+            participants=[current_user, peer],
+            last_message=None,
+            unread_count=0,
+        )
+
     messages = messages_by_conversation.get(conversation_id, [])
-    return ConversationDTO(
-        id=conversation_id,
-        title=peer.first_name,
-        participants=[current_user, peer],
-        last_message=messages[-1] if messages else None,
-        unread_count=0,
+    return conversations_by_id[conversation_id].model_copy(
+        update={
+            "title": peer.first_name,
+            "last_message": messages[-1] if messages else None,
+            "unread_count": unread_by_conversation.get(conversation_id, {}).get(current_user.id, 0),
+        },
     )
 
 
@@ -205,6 +216,7 @@ async def messages(
     conversation_id: str,
     current_user: UserDocument = Depends(get_current_user),
 ) -> list[MessageDTO]:
+    unread_by_conversation.setdefault(conversation_id, {})[str(current_user["id"])] = 0
     if conversation_id == "conv-demo":
         amine = _fallback_users()[0]
         return [
@@ -227,6 +239,7 @@ async def send_message(
     payload: SendMessageInput,
     current_user: UserDocument = Depends(get_current_user),
 ) -> MessageDTO:
+    current_user_id = str(current_user["id"])
     message = MessageDTO(
         id=str(uuid4()),
         conversation_id=conversation_id,
@@ -236,4 +249,14 @@ async def send_message(
         created_at=datetime.utcnow(),
     )
     messages_by_conversation.setdefault(conversation_id, []).append(message)
+
+    conversation = conversations_by_id.get(conversation_id)
+    if conversation:
+        unread = unread_by_conversation.setdefault(conversation_id, {})
+        for participant in conversation.participants:
+            if participant.id != current_user_id:
+                unread[participant.id] = unread.get(participant.id, 0) + 1
+            else:
+                unread[participant.id] = 0
+
     return message

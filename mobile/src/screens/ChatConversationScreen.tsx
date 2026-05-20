@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,11 +35,12 @@ type Props = {
   conversation: Conversation;
   onBack: () => void;
   onStartCall: (mode: CallMode, peer?: User, peerName?: string) => void;
+  onLoaded?: () => void;
 };
 
 const REALTIME_REFRESH_MS = 3000;
 
-export function ChatConversationScreen({ conversation, onBack, onStartCall }: Props) {
+export function ChatConversationScreen({ conversation, onBack, onStartCall, onLoaded }: Props) {
   const { token, user } = useAuth();
   const scrollRef = useRef<ScrollView | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -64,6 +67,7 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
       const data = await client.getConversationMessages(conversation.id, token ?? undefined);
       setMessages(data);
       setError(null);
+      onLoaded?.();
     } catch (requestError) {
       const message =
         requestError instanceof Error ? requestError.message : "Impossible de charger les messages.";
@@ -71,7 +75,7 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
     } finally {
       setLoading(false);
     }
-  }, [conversation.id, token]);
+  }, [conversation.id, onLoaded, token]);
 
   useEffect(() => {
     void loadMessages(true);
@@ -238,7 +242,11 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
   };
 
   return (
-    <View style={styles.shell}>
+    <KeyboardAvoidingView
+      style={styles.shell}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+    >
       <View style={styles.header}>
         <Pressable onPress={onBack}>
           <Text style={styles.back}>{"<"}</Text>
@@ -316,7 +324,7 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall }: Pr
           <Send size={19} color={colors.white} />
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -423,7 +431,10 @@ function formatMessageTime(value: string): string {
 
 const styles = StyleSheet.create({
   shell: {
+    flex: 1,
+    minHeight: 0,
     gap: 10,
+    paddingBottom: 8,
   },
   header: {
     flexDirection: "row",
@@ -475,11 +486,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   messageArea: {
-    minHeight: 430,
+    flex: 1,
+    minHeight: 0,
   },
   messageContent: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
     gap: 9,
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   loadingState: {
     minHeight: 260,
@@ -553,6 +568,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.lg,
     padding: 8,
+    marginBottom: 0,
   },
   toolButton: {
     width: 38,
@@ -567,7 +583,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    maxHeight: 96,
+    maxHeight: 128,
     minHeight: 38,
     color: colors.text,
     paddingHorizontal: 6,
