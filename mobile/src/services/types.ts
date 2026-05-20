@@ -81,6 +81,7 @@ export interface DressMeClient {
     input: { body: string; kind?: "text" | "image" | "audio" },
     token?: string,
   ): Promise<Message>;
+  deleteConversationMessage(conversationId: string, messageId: string, token?: string): Promise<void>;
   startCall(
     peerId: string,
     kind: "audio" | "video",

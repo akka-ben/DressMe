@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import {
   Image as ImageIcon,
@@ -39,6 +40,7 @@ type Props = {
 };
 
 const REALTIME_REFRESH_MS = 3000;
+const MAX_VOICE_NOTE_MS = 60_000;
 
 export function ChatConversationScreen({ conversation, onBack, onStartCall, onLoaded }: Props) {
   const { token, user } = useAuth();
@@ -201,8 +203,18 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall, onLo
       });
 
       const created = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      const startedAt = Date.now();
       setRecording(created.recording);
-      setRecordingStartedAt(Date.now());
+      setRecordingStartedAt(startedAt);
+
+      setTimeout(() => {
+        setRecording((currentRecording) => {
+          if (currentRecording === created.recording) {
+            void stopRecording(currentRecording, startedAt, Date.now());
+          }
+          return currentRecording;
+        });
+      }, MAX_VOICE_NOTE_MS);
     } catch (requestError) {
       const message =
         requestError instanceof Error ? requestError.message : "Impossible de demarrer l'enregistrement.";
@@ -210,16 +222,20 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall, onLo
     }
   };
 
-  const stopRecording = async () => {
-    if (!recording) {
+  const stopRecording = async (
+    activeRecording = recording,
+    startedAt = recordingStartedAt,
+    stoppedAt = Date.now(),
+  ) => {
+    if (!activeRecording) {
       return;
     }
 
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      const duration = recordingStartedAt
-        ? Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))
+      await activeRecording.stopAndUnloadAsync();
+      const uri = activeRecording.getURI();
+      const duration = startedAt
+        ? Math.max(1, Math.round((stoppedAt - startedAt) / 1000))
         : 1;
       setRecording(null);
       setRecordingStartedAt(null);
@@ -230,7 +246,10 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall, onLo
       });
 
       if (uri) {
-        await sendMessage("audio", `${uri}|${duration}`);
+        const base64Audio = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        await sendMessage("audio", `data:audio/m4a;base64,${base64Audio}|${duration}`);
       }
     } catch (requestError) {
       const message =
@@ -239,6 +258,31 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall, onLo
       setRecording(null);
       setRecordingStartedAt(null);
     }
+  };
+
+  const deleteMessage = async (message: Message) => {
+    if (!isMine(message, user) || message.id.startsWith("local-")) {
+      return;
+    }
+
+    Alert.alert("Supprimer le message", "Voulez-vous supprimer ce message ?", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: () => {
+          setMessages((current) => current.filter((item) => item.id !== message.id));
+          void client
+            .deleteConversationMessage(conversation.id, message.id, token ?? undefined)
+            .catch((requestError) => {
+              const messageText =
+                requestError instanceof Error ? requestError.message : "Impossible de supprimer le message.";
+              setError(messageText);
+              void loadMessages(true);
+            });
+        },
+      },
+    ]);
   };
 
   return (
@@ -293,6 +337,7 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall, onLo
               key={message.id}
               message={message}
               mine={isMine(message, user)}
+              onDelete={() => deleteMessage(message)}
             />
           ))
         )}
@@ -328,9 +373,21 @@ export function ChatConversationScreen({ conversation, onBack, onStartCall, onLo
   );
 }
 
-function MessageBubble({ message, mine }: { message: Message; mine: boolean }) {
+function MessageBubble({
+  message,
+  mine,
+  onDelete,
+}: {
+  message: Message;
+  mine: boolean;
+  onDelete: () => void;
+}) {
   return (
-    <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}>
+    <Pressable
+      onLongPress={mine ? onDelete : undefined}
+      delayLongPress={350}
+      style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther]}
+    >
       {message.kind === "image" ? (
         <Image source={{ uri: message.body }} style={styles.messageImage} />
       ) : message.kind === "audio" ? (
@@ -339,7 +396,7 @@ function MessageBubble({ message, mine }: { message: Message; mine: boolean }) {
         <Text style={[styles.messageText, mine && styles.textMine]}>{message.body}</Text>
       )}
       <Text style={[styles.time, mine && styles.timeMine]}>{formatMessageTime(message.createdAt)}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -364,7 +421,13 @@ function AudioMessage({ body, mine }: { body: string; mine: boolean }) {
     }
 
     if (!soundRef.current) {
-      const created = await Audio.Sound.createAsync({ uri });
+      const playableUri = await resolvePlayableAudioUri(uri);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+      });
+      const created = await Audio.Sound.createAsync({ uri: playableUri });
       soundRef.current = created.sound;
       created.sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
@@ -391,6 +454,28 @@ function AudioMessage({ body, mine }: { body: string; mine: boolean }) {
   );
 }
 
+async function resolvePlayableAudioUri(uri: string): Promise<string> {
+  if (!uri.startsWith("data:audio/")) {
+    return uri;
+  }
+
+  const [, payload] = uri.split(",", 2);
+  if (!payload) {
+    return uri;
+  }
+
+  const extension = uri.includes("audio/wav") ? "wav" : "m4a";
+  const fileUri = `${FileSystem.cacheDirectory ?? ""}dressme-audio-${hashString(uri)}.${extension}`;
+  const fileInfo = await FileSystem.getInfoAsync(fileUri);
+  if (!fileInfo.exists) {
+    await FileSystem.writeAsStringAsync(fileUri, payload, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
+
+  return fileUri;
+}
+
 function parseAudioBody(body: string): [string, string] {
   const [uri, rawDuration] = body.split("|");
   const seconds = Number(rawDuration);
@@ -398,6 +483,15 @@ function parseAudioBody(body: string): [string, string] {
     return [uri, "0:00"];
   }
   return [uri, `0:${String(seconds).padStart(2, "0")}`];
+}
+
+function hashString(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
 }
 
 function isMine(message: Message, user: User | null): boolean {

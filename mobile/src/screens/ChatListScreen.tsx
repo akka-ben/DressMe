@@ -73,9 +73,14 @@ export function ChatListScreen({ onOpenConversation, onCreateConversation }: Pro
       <View style={styles.header}>
         <Text style={styles.title}>Messages</Text>
         <View style={styles.headerActions}>
-          <View style={styles.headerIcon}>
+          <Pressable
+            style={styles.headerIcon}
+            onPress={() => void loadConversations(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Rafraichir les messages"
+          >
             <MessageCircle size={20} color={colors.burgundy} />
-          </View>
+          </Pressable>
           <Pressable style={styles.headerIcon} onPress={onCreateConversation}>
             <Plus size={20} color={colors.burgundy} />
           </Pressable>
