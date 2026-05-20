@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Audio } from "expo-av";
 import { Phone, PhoneOff, UserRound, Video } from "lucide-react-native";
 
 import type { User } from "../types/contracts";
@@ -14,10 +15,40 @@ type Props = {
   onReject: () => void;
 };
 
+const RINGTONE_URI =
+  "data:audio/wav;base64,UklGRkQcAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSAcAAAAAI4cASxCJ34QKPIt2o7TVeEw/VUaZCuJKBMT3PTC20rTWN9j+gEYmyqnKZUVm/d73TTTe92b95UVpymbKgEYY/pY30rTwtvc9BMTiShkK1UaMP1V4Y7TLdoo8n4QQicBLI4cAABy4//TvtiC79gN0yVyLKse0AKr5ZzUd9ft7CQLPiS2LKggnQX/52XVWdZr6mUIhSLMLIUiZQhr6lnWZdX/550FqCC2LD4kJAvt7HfXnNSr5dACqx5yLNMl2A2C777Y/9Ny4wAAjhwBLEInfhAo8i3ajtNV4TD9VRpkK4koExPc9MLbStNY32P6ARibKqcplRWb93vdNNN73Zv3lRWnKZsqARhj+ljfStPC29z0ExOJKGQrVRow/VXhjtMt2ijyfhBCJwEsjhwAAHLj/9O+2ILv2A3TJXIsqx7QAqvlnNR31+3sJAs+JLYsqCCdBf/nZdVZ1mvqZQiFIswshSJlCGvqWdZl1f/nnQWoILYsPiQkC+3sd9ec1Kvl0AKrHnIs0yXYDYLvvtj/03LjAACOHAEsQid+ECjyLdqO01XhMP1VGmQriSgTE9z0wttK01jfY/oBGJsqpymVFZv3e90003vdm/eVFacpmyoBGGP6WN9K08Lb3PQTE4koZCtVGjD9VeGO0y3aKPJ+EEInASyOHAAAcuP/077Ygu/YDdMlciyrHtACq+Wc1HfX7ewkCz4ktiyoIJ0F/+dl1VnWa+plCIUizCyFImUIa+pZ1mXV/+edBaggtiw+JCQL7ex315zUq+XQAqsecizTJdgNgu++2P/TcuM=";
+
 export function IncomingCallScreen({ mode, peer, peerName, onAccept, onReject }: Props) {
   useEffect(() => {
     Vibration.vibrate([0, 900, 500], true);
-    return () => Vibration.cancel();
+    let ringtone: Audio.Sound | null = null;
+    let stopped = false;
+
+    const startRingtone = async () => {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+      });
+      const created = await Audio.Sound.createAsync(
+        { uri: RINGTONE_URI },
+        { isLooping: true, shouldPlay: true, volume: 1 },
+      );
+      if (stopped) {
+        await created.sound.unloadAsync();
+        return;
+      }
+      ringtone = created.sound;
+    };
+
+    void startRingtone().catch(() => undefined);
+
+    return () => {
+      stopped = true;
+      Vibration.cancel();
+      void ringtone?.stopAsync().catch(() => undefined);
+      void ringtone?.unloadAsync().catch(() => undefined);
+    };
   }, []);
 
   return (

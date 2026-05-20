@@ -234,7 +234,7 @@ class MessageDTO(BaseModel):
 
 class SendMessageInput(BaseModel):
     kind: Literal["text", "image", "audio"] = "text"
-    body: str = Field(..., min_length=1, max_length=2000)
+    body: str = Field(..., min_length=1, max_length=2_500_000)
 
 
 class StartConversationInput(BaseModel):

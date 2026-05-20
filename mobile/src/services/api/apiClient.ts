@@ -880,6 +880,18 @@ export class ApiDressMeClient implements DressMeClient {
     return mapChatMessage(message);
   }
 
+  async deleteConversationMessage(
+    conversationId: string,
+    messageId: string,
+    token?: string,
+  ): Promise<void> {
+    await this.request<{ deleted: boolean }>(
+      `/chat/conversations/${conversationId}/messages/${messageId}`,
+      { method: "DELETE" },
+      token,
+    );
+  }
+
   async startCall(
     peerId: string,
     kind: "audio" | "video",

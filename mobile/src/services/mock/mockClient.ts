@@ -210,6 +210,10 @@ export class MockDressMeClient implements DressMeClient {
     };
   }
 
+  async deleteConversationMessage(): Promise<void> {
+    await delay();
+  }
+
   async startCall(): Promise<CallSession> {
     throw new Error("Mock calls are disabled. Use ApiDressMeClient.");
   }

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.db.session import get_db
@@ -260,3 +260,23 @@ async def send_message(
                 unread[participant.id] = 0
 
     return message
+
+
+@router.delete("/conversations/{conversation_id}/messages/{message_id}", response_model=dict[str, bool])
+async def delete_message(
+    conversation_id: str,
+    message_id: str,
+    current_user: UserDocument = Depends(get_current_user),
+) -> dict[str, bool]:
+    messages = messages_by_conversation.get(conversation_id, [])
+    current_user_id = str(current_user["id"])
+    message = next((item for item in messages if item.id == message_id), None)
+
+    if not message:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+
+    if message.sender.id != current_user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can delete only your messages")
+
+    messages_by_conversation[conversation_id] = [item for item in messages if item.id != message_id]
+    return {"deleted": True}

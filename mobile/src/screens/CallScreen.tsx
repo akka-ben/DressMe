@@ -9,7 +9,7 @@ import {
   RTCView,
   type MediaStream,
 } from "react-native-webrtc";
-import { Mic, Phone, Speaker, UserRound, Video, VideoOff } from "lucide-react-native";
+import { Mic, PhoneOff, Speaker, UserRound, Video, VideoOff } from "lucide-react-native";
 
 import { client } from "../services";
 import type { CallSession, User } from "../types/contracts";
@@ -112,6 +112,7 @@ export function CallScreen({
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [durationSeconds, setDurationSeconds] = useState(0);
 
   const sendCandidate = useCallback(async (candidate: unknown) => {
     const cleanCandidate = toPlainCandidate(candidate);
@@ -274,6 +275,17 @@ export function CallScreen({
   }, [pollCall]);
 
   useEffect(() => {
+    if (status !== "ongoing") {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      setDurationSeconds((value) => value + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  useEffect(() => {
     localStream?.getAudioTracks().forEach((track) => {
       track.enabled = !muted;
     });
@@ -337,7 +349,9 @@ export function CallScreen({
 
       <View style={styles.topInfo}>
         <Text style={styles.peerName}>{peerName}</Text>
-        <Text style={styles.status}>{error ?? (status === "connecting" ? "Connecting peer-to-peer..." : "Ongoing call")}</Text>
+        <Text style={styles.status}>
+          {error ?? (status === "connecting" ? "Connecting peer-to-peer..." : formatCallDuration(durationSeconds))}
+        </Text>
       </View>
 
       {mode === "video" ? (
@@ -360,7 +374,7 @@ export function CallScreen({
         </Pressable>
 
         <Pressable style={[styles.controlButton, styles.hangup]} onPress={() => void endCall()}>
-          <Phone size={26} color={colors.white} />
+          <PhoneOff size={26} color={colors.white} />
           <Text style={styles.controlLabel}>End</Text>
         </Pressable>
 
@@ -489,7 +503,6 @@ const styles = StyleSheet.create({
   },
   hangup: {
     backgroundColor: colors.danger,
-    transform: [{ rotate: "135deg" }],
   },
   controlLabel: {
     color: colors.white,
@@ -497,3 +510,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
 });
+
+function formatCallDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
