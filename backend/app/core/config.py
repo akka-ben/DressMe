@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=False, alias="SMTP_USE_TLS")
     smtp_timeout_seconds: int = Field(default=10, alias="SMTP_TIMEOUT_SECONDS")
     report_email_to: EmailStr = Field(default="dressme.mobile@gmail.com", alias="REPORT_EMAIL_TO")
+    security_email_to: EmailStr = Field(default="dressme.mobile@gmail.com", alias="SECURITY_EMAIL_TO")
 
     # Keep the raw env value to support comma-separated CORS origins.
     cors_origins_raw: str = Field(

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.db.session import get_db
@@ -43,13 +44,39 @@ async def login(
     return await service.login_with_email(db, payload)
 
 
-@router.get("/verify-email", response_model=MessageResponse)
+@router.get("/verify-email", response_class=HTMLResponse)
 async def verify_email_from_link(
     token: str = Query(..., min_length=20, max_length=255),
     db: AsyncIOMotorDatabase = Depends(get_db),
-) -> MessageResponse:
-    await service.verify_email_token(db, token)
-    return MessageResponse(message="Email verified successfully.")
+) -> HTMLResponse:
+    try:
+        user = await service.verify_email_token(db, token)
+    except HTTPException as exc:
+        return HTMLResponse(
+            service.build_auth_result_page(
+                title="Lien invalide ou expire",
+                message="La verification email ne peut pas etre terminee avec ce lien.",
+                tone="error",
+                detail=str(exc.detail),
+            ),
+            status_code=exc.status_code,
+        )
+
+    admin_approved = (
+        not user.get("requires_admin_approval")
+        or user.get("admin_status") == "approved"
+    )
+    message = (
+        "Votre email est confirme et votre compte est accepte. Vous pouvez vous connecter."
+        if admin_approved
+        else "Votre email est confirme. Votre compte attend maintenant l'acceptation de l'administrateur."
+    )
+    return HTMLResponse(
+        service.build_auth_result_page(
+            title="Email confirme",
+            message=message,
+        )
+    )
 
 
 @router.post("/verify-email", response_model=MessageResponse)
@@ -59,6 +86,37 @@ async def verify_email(
 ) -> MessageResponse:
     await service.verify_email_token(db, payload.token)
     return MessageResponse(message="Email verified successfully.")
+
+
+@router.get("/admin/approve-user", response_class=HTMLResponse)
+async def approve_user_from_admin_email(
+    token: str = Query(..., min_length=20, max_length=255),
+    db: AsyncIOMotorDatabase = Depends(get_db),
+) -> HTMLResponse:
+    try:
+        user = await service.approve_user_from_admin_token(db, token)
+    except HTTPException as exc:
+        return HTMLResponse(
+            service.build_auth_result_page(
+                title="Lien admin invalide ou expire",
+                message="L'acceptation du compte ne peut pas etre terminee avec ce lien.",
+                tone="error",
+                detail=str(exc.detail),
+            ),
+            status_code=exc.status_code,
+        )
+
+    message = (
+        "Compte accepte. L'utilisateur a deja confirme son email et peut maintenant se connecter."
+        if user.get("is_verified")
+        else "Compte accepte. L'utilisateur doit encore confirmer son email avant de pouvoir se connecter."
+    )
+    return HTMLResponse(
+        service.build_auth_result_page(
+            title="Compte accepte",
+            message=message,
+        )
+    )
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
