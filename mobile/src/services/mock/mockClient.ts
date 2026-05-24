@@ -118,6 +118,11 @@ export class MockDressMeClient implements DressMeClient {
     throw new Error("Mock togglePostSave is disabled. Use ApiDressMeClient.");
   }
 
+  async reportPost(): Promise<{ message: string }> {
+    await delay();
+    return { message: "Signalement envoye" };
+  }
+
   async getPostComments() {
     await delay();
     return mockComments;

@@ -9,7 +9,9 @@ from app.schemas.contracts import (
     CommentDTO,
     CreatePostInput,
     CreateStoryInput,
+    MessageResponse,
     PostDTO,
+    ReportPostInput,
     SearchResultDTO,
     StoryDTO,
     UserDTO,
@@ -133,6 +135,16 @@ async def share_post(
     current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
 ) -> PostDTO:
     return await service.register_share(db, post_id, current_user)
+
+
+@router.post("/posts/{post_id}/report", response_model=MessageResponse)
+async def report_post(
+    post_id: str,
+    payload: ReportPostInput,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
+) -> MessageResponse:
+    return MessageResponse(**await service.report_post(db, post_id, payload, current_user))
 
 
 @router.get("/posts/{post_id}/comments", response_model=list[CommentDTO])

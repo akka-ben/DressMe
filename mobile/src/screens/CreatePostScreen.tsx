@@ -31,8 +31,10 @@ import { PrimaryButton } from "../components/PrimaryButton";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
+import { iconTouchHitSlop, touchHitSlop, touchRetentionOffset } from "../utils/touchTargets";
 
 type ComposerMode = "post" | "story" | "reel" | "live";
+type CameraTool = "normal" | "create" | "boomerang" | "layout" | "handsFree";
 
 type SelectedMedia = {
   uri: string;
@@ -40,6 +42,7 @@ type SelectedMedia = {
   type: string;
   mediaType: "image" | "video";
   source: "camera" | "gallery";
+  layoutItems?: SelectedMedia[];
 };
 
 type CreatePostScreenProps = {
@@ -76,10 +79,13 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
   const [activeMode, setActiveMode] = useState<ComposerMode>("post");
+  const [activeTool, setActiveTool] = useState<CameraTool>("normal");
   const [cameraFacing, setCameraFacing] = useState<CameraType>("back");
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [composerStep, setComposerStep] = useState<"camera" | "details">("camera");
   const [selectedMedia, setSelectedMedia] = useState<SelectedMedia | null>(null);
+  const [layoutCaptures, setLayoutCaptures] = useState<SelectedMedia[]>([]);
+  const [createText, setCreateText] = useState("");
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [garmentTags, setGarmentTags] = useState("");
@@ -92,8 +98,9 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
   const [liveViewerCount, setLiveViewerCount] = useState(0);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  const isVideoMode = activeMode === "reel" || activeMode === "live";
-  const needsMicrophone = activeMode === "reel" || activeMode === "live";
+  const isToolVideoMode = activeTool === "boomerang" || activeTool === "handsFree";
+  const isVideoMode = activeMode === "reel" || activeMode === "live" || isToolVideoMode;
+  const needsMicrophone = activeMode === "reel" || activeMode === "live" || isToolVideoMode;
   const hasCameraAccess = Boolean(cameraPermission?.granted);
   const hasMicrophoneAccess = !needsMicrophone || Boolean(microphonePermission?.granted);
 
@@ -168,12 +175,22 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
   );
 
   const publishableMode = activeMode === "post" || activeMode === "reel" || activeMode === "story";
-  const selectMedia = (media: SelectedMedia) => {
+  const selectMedia = (
+    media: SelectedMedia,
+    options?: {
+      caption?: string;
+      hashtags?: string;
+      garmentTags?: string;
+    },
+  ) => {
     setSelectedMedia(media);
-    setCaption("");
-    setHashtags("");
-    setGarmentTags("");
+    setCaption(options?.caption ?? "");
+    setHashtags(options?.hashtags ?? "");
+    setGarmentTags(options?.garmentTags ?? "");
     setComposerStep("details");
+    if (media.layoutItems?.length) {
+      setLayoutCaptures(media.layoutItems);
+    }
     setMessage(
       media.source === "camera"
         ? "Media capture. Ajoute une legende puis publie."
@@ -199,7 +216,46 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
       setIsLive(false);
     }
     setActiveMode(mode);
+    setActiveTool("normal");
+    setLayoutCaptures([]);
     setMessage(getCameraMessage(mode));
+  };
+
+  const selectCameraTool = (tool: CameraTool) => {
+    if (tool === "layout" && activeTool === "layout" && layoutCaptures.length) {
+      finalizeLayout();
+      return;
+    }
+
+    if (isRecording) {
+      cameraRef.current?.stopRecording();
+    }
+    if (isLive) {
+      setIsLive(false);
+    }
+
+    const nextTool = activeTool === tool ? "normal" : tool;
+    setActiveTool(nextTool);
+    setLayoutCaptures([]);
+
+    if (nextTool === "normal") {
+      setMessage(getCameraMessage(activeMode));
+      return;
+    }
+
+    if (nextTool === "layout") {
+      setActiveMode("post");
+    }
+
+    if ((nextTool === "create" || nextTool === "boomerang" || nextTool === "handsFree") && activeMode === "live") {
+      setActiveMode("story");
+    }
+
+    if ((nextTool === "boomerang" || nextTool === "handsFree") && activeMode === "post") {
+      setActiveMode("story");
+    }
+
+    setMessage(getToolMessage(nextTool));
   };
 
   const openGallery = async () => {
@@ -216,13 +272,41 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: getGalleryMediaTypes(activeMode),
+        mediaTypes: activeTool === "layout" ? ["images"] : getGalleryMediaTypes(activeMode),
         allowsEditing: false,
+        allowsMultipleSelection: activeTool === "layout",
+        selectionLimit: activeTool === "layout" ? 4 : 1,
         quality: 0.9,
         videoMaxDuration: 90,
       });
 
       if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      if (activeTool === "layout" && result.assets.length > 1) {
+        const layoutItems: SelectedMedia[] = result.assets.slice(0, 4).map((asset) => {
+          const mediaType: "image" | "video" = asset.type === "video" ? "video" : "image";
+          const mimeType = asset.mimeType ?? inferMimeType(asset.uri, mediaType);
+          return {
+            uri: asset.uri,
+            name: asset.fileName ?? buildMediaFilename(mediaType, mimeType),
+            type: mimeType,
+            mediaType,
+            source: "gallery" as const,
+          };
+        });
+
+        if (layoutItems.length) {
+          selectMedia(
+            {
+              ...layoutItems[0],
+              name: `dressme-layout-${layoutItems.length}-photos.jpg`,
+              layoutItems,
+            },
+            { caption: "Layout DressMe" },
+          );
+        }
         return;
       }
 
@@ -242,7 +326,7 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
     }
   };
 
-  const capturePhoto = async () => {
+  const capturePhoto = async (options?: { caption?: string }) => {
     if (!hasCameraAccess) {
       await requestCameraPermission();
       return;
@@ -261,13 +345,16 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
         skipProcessing: false,
       });
 
-      selectMedia({
-        uri: picture.uri,
-        name: buildMediaFilename("image", "image/jpeg"),
-        type: "image/jpeg",
-        mediaType: "image",
-        source: "camera",
-      });
+      selectMedia(
+        {
+          uri: picture.uri,
+          name: buildMediaFilename("image", "image/jpeg"),
+          type: "image/jpeg",
+          mediaType: "image",
+          source: "camera",
+        },
+        { caption: options?.caption },
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Impossible de capturer la photo.";
       setMessage(errorMessage);
@@ -277,7 +364,74 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
     }
   };
 
-  const toggleVideoRecording = async () => {
+  const captureLayoutPhoto = async () => {
+    if (!hasCameraAccess) {
+      await requestCameraPermission();
+      return;
+    }
+
+    if (!cameraRef.current || isCapturing) {
+      return;
+    }
+
+    setIsCapturing(true);
+    setMessage(`Capture layout ${layoutCaptures.length + 1}/4...`);
+    try {
+      const picture = await cameraRef.current.takePictureAsync({
+        quality: 0.9,
+        exif: false,
+        skipProcessing: false,
+      });
+
+      const nextCapture: SelectedMedia = {
+        uri: picture.uri,
+        name: buildMediaFilename("image", "image/jpeg"),
+        type: "image/jpeg",
+        mediaType: "image",
+        source: "camera",
+      };
+      const nextCaptures = [...layoutCaptures, nextCapture];
+      setLayoutCaptures(nextCaptures);
+
+      if (nextCaptures.length >= 4) {
+        selectMedia(
+          {
+            ...nextCaptures[0],
+            name: "dressme-layout-4-photos.jpg",
+            layoutItems: nextCaptures,
+          },
+          { caption: "Layout DressMe" },
+        );
+        return;
+      }
+
+      setMessage(`Photo ${nextCaptures.length}/4 ajoutee. Capture encore ou appuie sur Layout pour terminer.`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Impossible de capturer la photo layout.";
+      setMessage(errorMessage);
+      Alert.alert("Layout indisponible", errorMessage);
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const finalizeLayout = () => {
+    if (!layoutCaptures.length) {
+      setMessage("Capture au moins une photo pour creer un layout.");
+      return;
+    }
+
+    selectMedia(
+      {
+        ...layoutCaptures[0],
+        name: `dressme-layout-${layoutCaptures.length}-photos.jpg`,
+        layoutItems: layoutCaptures,
+      },
+      { caption: "Layout DressMe" },
+    );
+  };
+
+  const toggleVideoRecording = async (options?: { maxDuration?: number; label?: string }) => {
     if (!hasCameraAccess) {
       await requestCameraPermission();
       return;
@@ -298,9 +452,9 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
     }
 
     setIsRecording(true);
-    setMessage("Enregistrement du reel...");
+    setMessage(options?.label ?? "Enregistrement du reel...");
     try {
-      const videoResult = await cameraRef.current.recordAsync({ maxDuration: 90 });
+      const videoResult = await cameraRef.current.recordAsync({ maxDuration: options?.maxDuration ?? 90 });
       if (!videoResult?.uri) {
         setMessage("Aucune video enregistree.");
         return;
@@ -312,7 +466,7 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
         type: "video/quicktime",
         mediaType: "video",
         source: "camera",
-      });
+      }, { caption: activeTool === "boomerang" ? "Boomerang DressMe" : undefined });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Impossible d'enregistrer le reel.";
       setMessage(errorMessage);
@@ -337,7 +491,22 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
       return;
     }
 
-    await capturePhoto();
+    if (activeTool === "boomerang") {
+      await toggleVideoRecording({ maxDuration: 2, label: "Boomerang en cours..." });
+      return;
+    }
+
+    if (activeTool === "handsFree") {
+      await toggleVideoRecording({ maxDuration: 90, label: "Hands-free enregistrement..." });
+      return;
+    }
+
+    if (activeTool === "layout") {
+      await captureLayoutPhoto();
+      return;
+    }
+
+    await capturePhoto({ caption: activeTool === "create" ? createText.trim() : undefined });
   };
 
   const toggleLiveSession = async () => {
@@ -365,6 +534,9 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
   const resetToCamera = () => {
     setSelectedMedia(null);
     setComposerStep("camera");
+    if (activeTool !== "layout") {
+      setLayoutCaptures([]);
+    }
     setMessage(getCameraMessage(activeMode));
   };
 
@@ -397,14 +569,20 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
     setIsPublishing(true);
     setMessage("Upload du media...");
     try {
-      const upload = await client.uploadMedia(
-        {
-          uri: selectedMedia.uri,
-          name: selectedMedia.name,
-          type: selectedMedia.type,
-        },
-        token,
+      const mediaItems = selectedMedia.layoutItems?.length ? selectedMedia.layoutItems : [selectedMedia];
+      const uploads = await Promise.all(
+        mediaItems.map((media) =>
+          client.uploadMedia(
+            {
+              uri: media.uri,
+              name: media.name,
+              type: media.type,
+            },
+            token,
+          ),
+        ),
       );
+      const upload = uploads[0];
 
       if (activeMode === "story") {
         setMessage("Creation de la story...");
@@ -412,8 +590,8 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
           {
             mediaUrl: upload.url,
             mediaType,
-            caption: finalCaption,
-          },
+          caption: finalCaption,
+        },
           token,
         );
 
@@ -428,7 +606,7 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
         {
           caption: finalCaption,
           mediaType,
-          imageUrls: [upload.url],
+          imageUrls: uploads.map((item) => item.url),
           hashtags: parsedTags,
           garmentTags: parsedGarmentTags,
         },
@@ -492,7 +670,21 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
             </View>
 
             <View style={styles.previewFrame}>
-              {selectedMedia?.mediaType === "image" ? (
+              {selectedMedia?.layoutItems?.length ? (
+                <View style={styles.layoutPreviewGrid}>
+                  {selectedMedia.layoutItems.map((item, index) => (
+                    <Image
+                      key={`${item.uri}-${index}`}
+                      source={{ uri: item.uri }}
+                      style={[
+                        styles.layoutPreviewImage,
+                        selectedMedia.layoutItems?.length === 1 && styles.layoutPreviewImageSingle,
+                      ]}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </View>
+              ) : selectedMedia?.mediaType === "image" ? (
                 <Image source={{ uri: selectedMedia.uri }} style={styles.previewImage} resizeMode="cover" />
               ) : selectedMedia?.uri ? (
                 <DressMeVideoPlayer
@@ -571,7 +763,11 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
             <View style={styles.selectedMediaBox}>
               <Text style={styles.selectedMediaName} numberOfLines={1}>{selectedMedia?.name}</Text>
               <Text style={styles.selectedMediaMeta}>
-                {selectedMedia?.mediaType === "video" ? "Video locale" : "Image locale"} - upload automatique au moment de publier
+                {selectedMedia?.layoutItems?.length
+                  ? `Layout ${selectedMedia.layoutItems.length} image(s)`
+                  : selectedMedia?.mediaType === "video"
+                    ? "Video locale"
+                    : "Image locale"} - upload automatique au moment de publier
               </Text>
             </View>
 
@@ -644,20 +840,75 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            hitSlop={12}
+            hitSlop={iconTouchHitSlop}
             pressRetentionOffset={12}
             style={styles.cameraIconButton}
+            onPress={() => Alert.alert("Parametres camera", "Flash, camera avant/arriere et outils de creation sont disponibles directement sur cet ecran.")}
           >
             <Settings size={26} color={colors.white} />
           </Pressable>
         </View>
 
         <View style={styles.cameraSideTools}>
-          <SideTool label="Aa" text="Create" />
-          <SideTool label="8" text="Boomerang" />
-          <SideTool label="[]" text="Layout" />
-          <SideTool label="O" text="Hands-free" />
+          <SideTool
+            active={activeTool === "create"}
+            label="Aa"
+            text="Create"
+            onPress={() => selectCameraTool("create")}
+          />
+          <SideTool
+            active={activeTool === "boomerang"}
+            label="8"
+            text="Boomerang"
+            onPress={() => selectCameraTool("boomerang")}
+          />
+          <SideTool
+            active={activeTool === "layout"}
+            badge={layoutCaptures.length ? `${layoutCaptures.length}/4` : undefined}
+            label="[]"
+            text="Layout"
+            onLongPress={finalizeLayout}
+            onPress={() => selectCameraTool("layout")}
+          />
+          <SideTool
+            active={activeTool === "handsFree"}
+            label="O"
+            text="Hands-free"
+            onPress={() => selectCameraTool("handsFree")}
+          />
         </View>
+
+        {activeTool === "create" ? (
+          <View style={styles.createTextPanel}>
+            <Text style={styles.createTextLabel}>Texte</Text>
+            <TextInput
+              value={createText}
+              onChangeText={setCreateText}
+              placeholder="Ecris ton texte..."
+              placeholderTextColor="rgba(255,255,255,0.72)"
+              multiline
+              style={styles.createTextInput}
+            />
+            <Text style={styles.createHint}>Capture pour utiliser ce texte comme legende.</Text>
+          </View>
+        ) : null}
+
+        {activeTool === "layout" && layoutCaptures.length ? (
+          <View style={styles.layoutProgress}>
+            {layoutCaptures.map((item, index) => (
+              <Image key={`${item.uri}-${index}`} source={{ uri: item.uri }} style={styles.layoutThumb} />
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={touchHitSlop}
+              onPress={finalizeLayout}
+              pressRetentionOffset={touchRetentionOffset}
+              style={styles.layoutDoneButton}
+            >
+              <Text style={styles.layoutDoneText}>Terminer</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {activeMode === "reel" && isRecording ? (
           <View style={styles.recordingBadge}>
@@ -723,6 +974,7 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
                   styles.captureInner,
                   activeMode === "reel" && styles.reelCaptureInner,
                   activeMode === "live" && styles.liveCaptureInner,
+                  isRecording && styles.recordingCaptureInner,
                   isLive && styles.liveActiveCaptureInner,
                 ]}
               >
@@ -764,12 +1016,36 @@ export function CreatePostScreen({ onClose, onCreated, onOpenLive }: CreatePostS
   );
 }
 
-function SideTool({ label, text }: { label: string; text: string }) {
+function SideTool({
+  active,
+  badge,
+  label,
+  text,
+  onLongPress,
+  onPress,
+}: {
+  active: boolean;
+  badge?: string;
+  label: string;
+  text: string;
+  onLongPress?: () => void;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.sideTool}>
-      <Text style={styles.sideToolIcon}>{label}</Text>
-      <Text style={styles.sideToolText}>{text}</Text>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      hitSlop={touchHitSlop}
+      onLongPress={onLongPress}
+      onPress={onPress}
+      pressRetentionOffset={touchRetentionOffset}
+      style={[styles.sideTool, active && styles.sideToolActive]}
+    >
+      <View style={styles.sideToolIconWrap}>
+        <Text style={[styles.sideToolIcon, active && styles.sideToolIconActive]}>{label}</Text>
+        {badge ? <Text style={styles.sideToolBadge}>{badge}</Text> : null}
+      </View>
+      <Text style={[styles.sideToolText, active && styles.sideToolTextActive]}>{text}</Text>
+    </Pressable>
   );
 }
 
@@ -783,6 +1059,21 @@ function getCameraMessage(mode: ComposerMode): string {
       return "Appuie pour enregistrer un reel, puis appuie encore pour terminer.";
     case "live":
       return "Appuie sur le bouton rouge pour demarrer un live.";
+  }
+}
+
+function getToolMessage(tool: CameraTool): string {
+  switch (tool) {
+    case "create":
+      return "Mode Create actif. Ecris un texte puis capture pour l'ajouter a la publication.";
+    case "boomerang":
+      return "Mode Boomerang actif. Capture une video courte de 2 secondes.";
+    case "layout":
+      return "Mode Layout actif. Capture jusqu'a 4 photos, puis appuie sur Terminer.";
+    case "handsFree":
+      return "Mode Hands-free actif. Appuie une fois pour enregistrer, puis encore pour terminer.";
+    case "normal":
+      return "Mode camera normal.";
   }
 }
 
@@ -896,13 +1187,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    minHeight: 46,
+    borderRadius: 18,
+    paddingRight: 12,
+  },
+  sideToolActive: {
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  sideToolIconWrap: {
+    minWidth: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sideToolIcon: {
     color: colors.white,
     fontSize: 30,
     fontWeight: "800",
-    minWidth: 42,
     textAlign: "center",
+  },
+  sideToolIconActive: {
+    color: colors.gold,
+  },
+  sideToolBadge: {
+    marginTop: -4,
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900",
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: colors.burgundy,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   sideToolText: {
     color: colors.white,
@@ -911,6 +1226,73 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.55)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
+  },
+  sideToolTextActive: {
+    color: colors.gold,
+  },
+  createTextPanel: {
+    position: "absolute",
+    left: 22,
+    right: 22,
+    top: "21%",
+    borderRadius: 24,
+    padding: 16,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    gap: 8,
+  },
+  createTextLabel: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 13,
+  },
+  createTextInput: {
+    minHeight: 88,
+    color: colors.white,
+    fontSize: 24,
+    fontWeight: "900",
+    textAlignVertical: "top",
+  },
+  createHint: {
+    color: "rgba(255,255,255,0.72)",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  layoutProgress: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    bottom: 202,
+    minHeight: 66,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+  },
+  layoutThumb: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: colors.beige,
+  },
+  layoutDoneButton: {
+    marginLeft: "auto",
+    minHeight: 38,
+    borderRadius: 19,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  layoutDoneText: {
+    color: colors.burgundy,
+    fontWeight: "900",
+    fontSize: 12,
   },
   recordingBadge: {
     position: "absolute",
@@ -1058,6 +1440,12 @@ const styles = StyleSheet.create({
   reelCaptureInner: {
     backgroundColor: "#E53935",
   },
+  recordingCaptureInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    backgroundColor: colors.white,
+  },
   liveCaptureInner: {
     alignItems: "center",
     justifyContent: "center",
@@ -1163,6 +1551,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.beige,
   },
   previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  layoutPreviewGrid: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 2,
+    backgroundColor: colors.black,
+  },
+  layoutPreviewImage: {
+    width: "49.7%",
+    height: "49.7%",
+    backgroundColor: colors.beige,
+  },
+  layoutPreviewImageSingle: {
     width: "100%",
     height: "100%",
   },

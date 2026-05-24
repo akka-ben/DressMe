@@ -1,3 +1,4 @@
+import html
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -16,12 +17,15 @@ from app.schemas.contracts import (
     PollDTO,
     PollOptionDTO,
     PostDTO,
+    ReportPostInput,
     SearchHashtagDTO,
     SearchPlaceDTO,
     SearchResultDTO,
     StoryDTO,
     UserDTO,
 )
+from app.core.config import settings
+from app.modules.auth.email_service import email_service
 
 PostDocument = dict[str, Any]
 UserDocument = dict[str, Any]
@@ -801,6 +805,142 @@ async def register_share(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
     return await post_to_dto(db, updated, str(current_user["_id"]))
+
+
+async def report_post(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    payload: ReportPostInput,
+    current_user: UserDocument,
+) -> dict[str, str]:
+    post = await db.posts.find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+
+    now = utc_now()
+    reporter_id = str(current_user["_id"])
+    author_id = str(post.get("author_id") or "")
+    author = await db.users.find_one({"_id": author_id}) if author_id else None
+    media_urls = normalize_image_urls(post)
+    report_id = str(uuid4())
+    report: dict[str, Any] = {
+        "_id": report_id,
+        "id": report_id,
+        "post_id": post_id,
+        "post_author_id": author_id,
+        "reporter_id": reporter_id,
+        "reporter_email": current_user.get("email"),
+        "reason_key": payload.reason_key,
+        "reason_label": payload.reason_label,
+        "post_caption": str(post.get("caption") or post.get("description") or ""),
+        "post_media_urls": media_urls,
+        "status": "new",
+        "email_status": "pending",
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.post_reports.insert_one(report)
+
+    try:
+        await email_service.send_email(
+            to_email=str(settings.report_email_to),
+            subject=f"[DressMe] Nouveau signalement de post - {payload.reason_label}",
+            html_body=build_post_report_email(
+                report=report,
+                current_user=current_user,
+                author=author,
+            ),
+        )
+    except Exception as exc:
+        await db.post_reports.update_one(
+            {"_id": report_id},
+            {
+                "$set": {
+                    "email_status": "failed",
+                    "email_error": str(exc),
+                    "updated_at": utc_now(),
+                }
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Le signalement a ete enregistre, mais l'email administrateur n'a pas pu etre envoye.",
+        ) from exc
+
+    await db.post_reports.update_one(
+        {"_id": report_id},
+        {"$set": {"email_status": "sent", "updated_at": utc_now()}},
+    )
+    return {"message": "Signalement envoye"}
+
+
+def build_post_report_email(
+    report: dict[str, Any],
+    current_user: UserDocument,
+    author: UserDocument | None,
+) -> str:
+    reporter_name = display_user_name(current_user)
+    author_name = display_user_name(author) if author else "Auteur inconnu"
+    media_urls = report.get("post_media_urls") or []
+    media_lines = "".join(
+        f"<li style=\"margin-bottom:6px;word-break:break-all;\">{html.escape(str(url))}</li>"
+        for url in media_urls
+    ) or "<li>Aucun media detecte</li>"
+
+    fields = [
+        ("ID du signalement", report.get("id")),
+        ("Date", report.get("created_at")),
+        ("Raison", report.get("reason_label")),
+        ("Cle raison", report.get("reason_key")),
+        ("Post ID", report.get("post_id")),
+        ("Auteur du post", f"{author_name} ({report.get('post_author_id') or 'id inconnu'})"),
+        ("Utilisateur qui signale", f"{reporter_name} ({report.get('reporter_id')})"),
+        ("Email utilisateur", report.get("reporter_email") or "Non renseigne"),
+        ("Caption", report.get("post_caption") or "Aucune caption"),
+    ]
+    rows = "".join(
+        "<tr>"
+        f"<td style=\"padding:10px 12px;border-bottom:1px solid #eee;color:#666;font-weight:700;\">{html.escape(label)}</td>"
+        f"<td style=\"padding:10px 12px;border-bottom:1px solid #eee;color:#111;\">{html.escape(str(value))}</td>"
+        "</tr>"
+        for label, value in fields
+    )
+
+    return f"""
+    <!doctype html>
+    <html lang="fr">
+      <body style="margin:0;background:#f6f1eb;font-family:Arial,sans-serif;color:#151515;">
+        <div style="max-width:680px;margin:0 auto;padding:28px 14px;">
+          <div style="background:#ffffff;border:1px solid #eadfd5;border-radius:12px;padding:24px;">
+            <h1 style="margin:0 0 6px;font-size:24px;color:#7a2032;">Nouveau signalement DressMe</h1>
+            <p style="margin:0 0 20px;color:#666;line-height:1.5;">
+              Un utilisateur a signale une publication. Details ci-dessous pour moderation.
+            </p>
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#fff;">
+              {rows}
+            </table>
+            <h2 style="font-size:17px;margin:22px 0 10px;color:#111;">Medias du post</h2>
+            <ul style="margin:0;padding-left:18px;color:#111;line-height:1.5;">
+              {media_lines}
+            </ul>
+          </div>
+        </div>
+      </body>
+    </html>
+    """
+
+
+def display_user_name(user: UserDocument | None) -> str:
+    if not user:
+        return "Utilisateur inconnu"
+    name = f"{user.get('first_name') or ''} {user.get('last_name') or ''}".strip()
+    if name:
+        return name
+    if user.get("username"):
+        return str(user["username"])
+    if user.get("email"):
+        return str(user["email"])
+    return "Utilisateur DressMe"
 
 
 async def toggle_save(

@@ -16,6 +16,8 @@ import type {
   Post,
   PostStats,
   Profile,
+  ReportPostInput,
+  ReportPostResult,
   SearchHashtag,
   SearchPlace,
   SearchResults,
@@ -675,6 +677,20 @@ export class ApiDressMeClient implements DressMeClient {
       token,
     );
     return mapPost(post);
+  }
+
+  async reportPost(postId: string, input: ReportPostInput, token: string): Promise<ReportPostResult> {
+    return this.request<BackendMessage>(
+      `/posts/${postId}/report`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          reason_key: input.reasonKey,
+          reason_label: input.reasonLabel,
+        }),
+      },
+      token,
+    );
   }
 
   async getPostComments(postId: string, input?: { limit?: number; offset?: number }): Promise<Comment[]> {

@@ -35,6 +35,15 @@ class AddCommentInput(BaseModel):
     content: str = Field(..., min_length=1, max_length=500)
 
 
+class ReportPostInput(BaseModel):
+    reason_key: str = Field(..., min_length=1, max_length=80)
+    reason_label: str = Field(..., min_length=1, max_length=180)
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
 class PollOptionDTO(BaseModel):
     id: str
     label: str

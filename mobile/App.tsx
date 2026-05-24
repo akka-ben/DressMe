@@ -83,6 +83,7 @@ function AppShell() {
   const [resetToken, setResetToken] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostFocusComment, setSelectedPostFocusComment] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [liveRoute, setLiveRoute] = useState<LiveRoute | null>(null);
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -191,6 +192,7 @@ function AppShell() {
             initialEmail={lastRegisteredEmail}
             onLoginSuccess={() => {
               setSelectedPostId(null);
+              setSelectedPostFocusComment(false);
               setShowCreatePost(false);
               setActiveTab("feed");
             }}
@@ -258,11 +260,13 @@ function AppShell() {
           onOpenLive={() => {
             setShowCreatePost(false);
             setSelectedPostId(null);
+            setSelectedPostFocusComment(false);
             setLiveRoute({ role: "host" });
           }}
           onCreated={(createdType) => {
             setShowCreatePost(false);
             setSelectedPostId(null);
+            setSelectedPostFocusComment(false);
             setActiveTab(createdType === "reel" ? "reels" : "feed");
           }}
         />
@@ -270,7 +274,16 @@ function AppShell() {
     }
 
     if (selectedPostId) {
-      return <PostDetailScreen postId={selectedPostId} onBack={() => setSelectedPostId(null)} />;
+      return (
+        <PostDetailScreen
+          postId={selectedPostId}
+          initialFocusComment={selectedPostFocusComment}
+          onBack={() => {
+            setSelectedPostId(null);
+            setSelectedPostFocusComment(false);
+          }}
+        />
+      );
     }
 
     if (viewingUserId) {
@@ -278,7 +291,10 @@ function AppShell() {
         <UserProfileScreen
           userId={viewingUserId}
           onBack={() => setViewingUserId(null)}
-          onOpenPost={setSelectedPostId}
+          onOpenPost={(postId) => {
+            setSelectedPostFocusComment(false);
+            setSelectedPostId(postId);
+          }}
           onOpenProfile={(userId) => setViewingUserId(userId)}
         />
       );
@@ -288,14 +304,23 @@ function AppShell() {
       case "feed":
         return (
           <HomeFeedScreen
-            onOpenPost={setSelectedPostId}
+            onOpenPost={(postId) => {
+              setSelectedPostFocusComment(false);
+              setSelectedPostId(postId);
+            }}
+            onOpenComments={(postId) => {
+              setSelectedPostFocusComment(true);
+              setSelectedPostId(postId);
+            }}
             onOpenLive={(session) => {
               setSelectedPostId(null);
+              setSelectedPostFocusComment(false);
               setShowCreatePost(false);
               setLiveRoute({ role: "viewer", session });
             }}
             onOpenCreate={() => {
               setSelectedPostId(null);
+              setSelectedPostFocusComment(false);
               setShowCreatePost(true);
             }}
             onOpenProfile={(userId: string) => setViewingUserId(userId)}
@@ -303,9 +328,24 @@ function AppShell() {
         );
 
       case "search":
-        return <SearchScreen onOpenPost={setSelectedPostId} />;
+        return (
+          <SearchScreen
+            onOpenPost={(postId) => {
+              setSelectedPostFocusComment(false);
+              setSelectedPostId(postId);
+            }}
+          />
+        );
       case "reels":
-        return <ReelsScreen onOpenPost={setSelectedPostId} />;
+        return (
+          <ReelsScreen
+            onOpenPost={(postId) => {
+              setSelectedPostFocusComment(false);
+              setSelectedPostId(postId);
+            }}
+            onOpenProfile={(userId) => setViewingUserId(userId)}
+          />
+        );
 
       case "messages":
         return (
@@ -351,7 +391,10 @@ function AppShell() {
         }
         return (
           <ProfileScreen
-            onOpenPost={setSelectedPostId}
+            onOpenPost={(postId) => {
+              setSelectedPostFocusComment(false);
+              setSelectedPostId(postId);
+            }}
             onEditProfile={() => setShowEditProfile(true)}
             onOpenFollowers={(uid) => setFollowersState({ userId: uid, mode: "followers" })}
             onOpenFollowing={(uid) => setFollowersState({ userId: uid, mode: "following" })}
@@ -362,6 +405,7 @@ function AppShell() {
 
   const changeTab = (tab: AppTab) => {
     setSelectedPostId(null);
+    setSelectedPostFocusComment(false);
     setShowCreatePost(false);
     setShowEditProfile(false);
     setShowChangePassword(false);
@@ -371,9 +415,23 @@ function AppShell() {
     setActiveTab(tab);
   };
 
+  const isReelsRootScreen =
+    activeTab === "reels" &&
+    !viewingUserId &&
+    !selectedPostId &&
+    !showCreatePost &&
+    !liveRoute &&
+    !followersState &&
+    !showEditProfile &&
+    !showChangePassword;
+
   return (
     <View style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle={isReelsRootScreen ? "light-content" : "dark-content"}
+        translucent
+        backgroundColor="transparent"
+      />
       <LinearGradient colors={["#E8E2D8", "#F0EBE3"]} style={styles.container}>
         <View style={styles.device}>
           {showSplash ? (
@@ -391,6 +449,9 @@ function AppShell() {
                   style={[
                     styles.tabScreen,
                     activeTab === "messages" && messagesDetailOpen && styles.tabScreenFull,
+                    isReelsRootScreen && styles.tabScreenFull,
+                    isReelsRootScreen && styles.reelsTabScreen,
+                    selectedPostId && styles.tabScreenFull,
                   ]}
                 >
                   {renderTab()}
@@ -409,6 +470,7 @@ function AppShell() {
 
               {isAuthenticated &&
               authRoute !== "reset" &&
+              !selectedPostId &&
               !showCreatePost &&
               !liveRoute &&
               !(activeTab === "messages" && messagesDetailOpen) ? (
@@ -584,6 +646,10 @@ const styles = StyleSheet.create({
   },
   tabScreenFull: {
     paddingBottom: 0,
+  },
+  reelsTabScreen: {
+    paddingTop: 0,
+    backgroundColor: colors.black,
   },
   screenContent: {
     flexGrow: 1,

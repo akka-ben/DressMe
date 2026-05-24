@@ -14,6 +14,7 @@ import {
 import { Grid3X3, Hash, Lock, MapPin, MoreHorizontal, Play, Search, UserRound, Video, X } from "lucide-react-native";
 
 import { useAuth } from "../context/AuthContext";
+import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
 import { client } from "../services";
 import { API_URL } from "../services/api/apiClient";
 import { colors, fonts, radius } from "../theme/dressme";
@@ -606,17 +607,17 @@ function TopResults({
     return <SearchState label="Aucun resultat dynamique trouve." />;
   }
 
+  const mixedPosts = mergeSearchMediaResults(results.topPosts, results.videos);
+
   return (
     <View style={styles.sections}>
       <UserResults users={results.users.slice(0, 5)} onSelectUser={onSelectUser} compact />
       <HashtagResults hashtags={results.hashtags.slice(0, 5)} onSelect={onSelectHashtag} compact />
       <PlaceResults places={results.places.slice(0, 5)} onSelect={onSelectPlace} compact />
-      <SectionTitle icon={<Grid3X3 size={18} color={colors.burgundy} />} title="Publications" />
-      <PostGrid posts={results.topPosts} onSelectPost={onSelectPost} />
-      {results.videos.length ? (
+      {mixedPosts.length ? (
         <>
-          <SectionTitle icon={<Video size={18} color={colors.burgundy} />} title="Videos" />
-          <PostGrid posts={results.videos.slice(0, 6)} onSelectPost={onSelectPost} videoOnly />
+          <SectionTitle icon={<Grid3X3 size={18} color={colors.burgundy} />} title="Publications et videos" />
+          <PostGrid posts={mixedPosts} onSelectPost={onSelectPost} />
         </>
       ) : null}
     </View>
@@ -1025,16 +1026,34 @@ function PrivateProfileState() {
 
 function PostThumb({ post, fill = false }: { post: Post; fill?: boolean }) {
   const mediaUrl = resolveMediaUrl(post.imageUrls[0]);
+  const isVideo = post.mediaType === "video" || isVideoUrl(mediaUrl);
   return (
     <View style={fill ? styles.thumbFill : styles.rowThumb}>
-      {mediaUrl ? <Image source={{ uri: mediaUrl }} resizeMode="cover" style={styles.thumbImage} /> : null}
-      {post.mediaType === "video" ? (
+      {mediaUrl && isVideo ? (
+        <DressMeVideoPlayer
+          uri={mediaUrl}
+          style={styles.thumbImage}
+          autoPlay
+          loop
+          muted
+          nativeControls={false}
+          contentFit="cover"
+          pointerEvents="none"
+        />
+      ) : mediaUrl ? (
+        <Image source={{ uri: mediaUrl }} resizeMode="cover" style={styles.thumbImage} />
+      ) : null}
+      {isVideo ? (
         <View style={styles.videoBadge}>
           <Play size={14} color={colors.white} fill={colors.white} />
         </View>
       ) : null}
     </View>
   );
+}
+
+function isVideoUrl(url?: string): boolean {
+  return Boolean(url?.toLowerCase().split("?")[0].match(/\.(mp4|mov|m4v|webm|m3u8|mpd)$/));
 }
 
 function historyIcon(kind: SearchHistoryKind) {
@@ -1096,16 +1115,64 @@ function followButtonLabel(profile: Profile): string {
 }
 
 function mergeExplorePosts(feedPosts: Post[], reelPosts: Post[]): Post[] {
+  return interleaveMediaPosts(uniquePosts([...feedPosts, ...reelPosts]));
+}
+
+function mergeSearchMediaResults(posts: Post[], videos: Post[]): Post[] {
+  return interleaveMediaPosts(uniquePosts([...posts, ...videos]));
+}
+
+function uniquePosts(posts: Post[]): Post[] {
   const postsById = new Map<string, Post>();
-  for (const post of [...feedPosts, ...reelPosts]) {
+  for (const post of posts) {
     postsById.set(post.id, post);
   }
 
-  return Array.from(postsById.values()).sort((left, right) => {
-    const leftTime = new Date(left.createdAt).getTime();
-    const rightTime = new Date(right.createdAt).getTime();
-    return rightTime - leftTime;
-  });
+  return Array.from(postsById.values());
+}
+
+function interleaveMediaPosts(posts: Post[]): Post[] {
+  const sortedImages = posts.filter((post) => !isPostVideo(post)).sort(comparePostsByDateDesc);
+  const sortedVideos = posts.filter(isPostVideo).sort(comparePostsByDateDesc);
+
+  if (!sortedImages.length) {
+    return sortedVideos;
+  }
+
+  if (!sortedVideos.length) {
+    return sortedImages;
+  }
+
+  const primary = sortedImages.length >= sortedVideos.length ? sortedImages : sortedVideos;
+  const secondary = sortedImages.length >= sortedVideos.length ? sortedVideos : sortedImages;
+  const mixed: Post[] = [];
+  const ratio = Math.max(1, Math.ceil(primary.length / secondary.length));
+  let primaryIndex = 0;
+  let secondaryIndex = 0;
+
+  while (primaryIndex < primary.length || secondaryIndex < secondary.length) {
+    for (let count = 0; count < ratio && primaryIndex < primary.length; count += 1) {
+      mixed.push(primary[primaryIndex]);
+      primaryIndex += 1;
+    }
+
+    if (secondaryIndex < secondary.length) {
+      mixed.push(secondary[secondaryIndex]);
+      secondaryIndex += 1;
+    }
+  }
+
+  return mixed;
+}
+
+function isPostVideo(post: Post): boolean {
+  return post.mediaType === "video" || isVideoUrl(post.imageUrls[0]);
+}
+
+function comparePostsByDateDesc(left: Post, right: Post): number {
+  const leftTime = new Date(left.createdAt).getTime();
+  const rightTime = new Date(right.createdAt).getTime();
+  return rightTime - leftTime;
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {

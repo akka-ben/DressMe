@@ -27,6 +27,7 @@ import {
 } from "lucide-react-native";
 
 import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
+import { PostReportModal } from "../components/PostReportModal";
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
@@ -35,9 +36,10 @@ import type { Comment, Post, User } from "../types/contracts";
 type Props = {
   postId: string;
   onBack: () => void;
+  initialFocusComment?: boolean;
 };
 
-export function PostDetailScreen({ postId, onBack }: Props) {
+export function PostDetailScreen({ postId, onBack, initialFocusComment = false }: Props) {
   const { token, user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -48,6 +50,10 @@ export function PostDetailScreen({ postId, onBack }: Props) {
   const [liking, setLiking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
+  const commentsListRef = useRef<FlatList<Comment>>(null);
+  const commentInputRef = useRef<TextInput>(null);
 
   const loadPost = useCallback(async () => {
     setError("");
@@ -72,8 +78,25 @@ export function PostDetailScreen({ postId, onBack }: Props) {
 
   const author = useMemo(() => (post ? toDisplayUser(post.author) : null), [post]);
 
+  const focusCommentComposer = useCallback(() => {
+    requestAnimationFrame(() => {
+      commentsListRef.current?.scrollToEnd({ animated: true });
+      commentInputRef.current?.focus();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!loading && initialFocusComment) {
+      focusCommentComposer();
+    }
+  }, [focusCommentComposer, initialFocusComment, loading]);
+
   const toggleLike = async () => {
-    if (!token || !post || liking) {
+    if (!post || liking) {
+      return;
+    }
+    if (!token) {
+      Alert.alert("Connexion requise", "Connecte-toi pour aimer cette publication.");
       return;
     }
 
@@ -97,7 +120,11 @@ export function PostDetailScreen({ postId, onBack }: Props) {
   };
 
   const toggleSave = async () => {
-    if (!token || !post || saving) {
+    if (!post || saving) {
+      return;
+    }
+    if (!token) {
+      Alert.alert("Connexion requise", "Connecte-toi pour enregistrer cette publication.");
       return;
     }
 
@@ -119,7 +146,14 @@ export function PostDetailScreen({ postId, onBack }: Props) {
     }
   };
 
-  const shareCurrentPost = async () => {
+  const openShareSheet = () => {
+    if (!post) {
+      return;
+    }
+    setShareVisible(true);
+  };
+
+  const shareCurrentPostExternally = async () => {
     if (!post) {
       return;
     }
@@ -154,20 +188,38 @@ export function PostDetailScreen({ postId, onBack }: Props) {
       return;
     }
 
-    if (!token) {
+    if (!token || !user) {
       Alert.alert("Connexion requise", "Connecte-toi pour commenter cette publication.");
       return;
     }
 
+    const optimisticComment: Comment = {
+      id: `local-comment-${Date.now()}`,
+      author: user,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
     setSubmitting(true);
+    setComments((current) => [optimisticComment, ...current]);
+    setCommentText("");
+    setPost((current) =>
+      current ? { ...current, commentCount: current.commentCount + 1 } : current,
+    );
+
     try {
       const createdComment = await client.addPostComment(postId, content, token);
-      setComments((current) => [createdComment, ...current]);
-      setCommentText("");
-      setPost((current) =>
-        current ? { ...current, commentCount: current.commentCount + 1 } : current,
+      setComments((current) =>
+        current.map((comment) =>
+          comment.id === optimisticComment.id ? createdComment : comment,
+        ),
       );
     } catch (commentError) {
+      setComments((current) => current.filter((comment) => comment.id !== optimisticComment.id));
+      setCommentText(content);
+      setPost((current) =>
+        current ? { ...current, commentCount: Math.max(0, current.commentCount - 1) } : current,
+      );
       Alert.alert(
         "Commentaire impossible",
         commentError instanceof Error ? commentError.message : "Le commentaire n'a pas ete envoye.",
@@ -181,7 +233,7 @@ export function PostDetailScreen({ postId, onBack }: Props) {
     <KeyboardAvoidingView
       style={styles.shell}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 84 : 0}
+      keyboardVerticalOffset={0}
     >
       <View style={styles.topBar}>
         <Pressable style={styles.backButton} onPress={onBack}>
@@ -209,9 +261,11 @@ export function PostDetailScreen({ postId, onBack }: Props) {
       ) : (
         <>
           <FlatList
+            ref={commentsListRef}
             data={comments}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.content}
             ListHeaderComponent={
               <PostDetailHeader
@@ -219,7 +273,8 @@ export function PostDetailScreen({ postId, onBack }: Props) {
                 post={post}
                 onLike={() => void toggleLike()}
                 onSave={() => void toggleSave()}
-                onShare={() => void shareCurrentPost()}
+                onShare={openShareSheet}
+                onComment={focusCommentComposer}
                 onOpenMenu={() => setMenuVisible(true)}
               />
             }
@@ -238,6 +293,7 @@ export function PostDetailScreen({ postId, onBack }: Props) {
               style={styles.composerAvatar}
             />
             <TextInput
+              ref={commentInputRef}
               value={commentText}
               onChangeText={setCommentText}
               placeholder="Ajouter un commentaire..."
@@ -266,7 +322,7 @@ export function PostDetailScreen({ postId, onBack }: Props) {
         onClose={() => setMenuVisible(false)}
         onShare={() => {
           setMenuVisible(false);
-          void shareCurrentPost();
+          openShareSheet();
         }}
         onSave={() => {
           setMenuVisible(false);
@@ -276,6 +332,26 @@ export function PostDetailScreen({ postId, onBack }: Props) {
           setMenuVisible(false);
           void loadPost();
         }}
+        onReport={() => {
+          setMenuVisible(false);
+          setReportVisible(true);
+        }}
+      />
+      <PostReportModal
+        visible={reportVisible && Boolean(post)}
+        postId={post?.id}
+        authorUsername={author?.username}
+        token={token ?? undefined}
+        onClose={() => setReportVisible(false)}
+      />
+      <PostDetailShareSheet
+        visible={shareVisible && Boolean(post)}
+        post={post}
+        token={token ?? undefined}
+        currentUserId={user?.id}
+        onClose={() => setShareVisible(false)}
+        onShared={setPost}
+        onExternalShare={() => void shareCurrentPostExternally()}
       />
     </KeyboardAvoidingView>
   );
@@ -287,6 +363,7 @@ function PostDetailHeader({
   onLike,
   onSave,
   onShare,
+  onComment,
   onOpenMenu,
 }: {
   author: DisplayUser;
@@ -294,6 +371,7 @@ function PostDetailHeader({
   onLike: () => void;
   onSave: () => void;
   onShare: () => void;
+  onComment: () => void;
   onOpenMenu: () => void;
 }) {
   const mediaUrl = post.imageUrls[0];
@@ -397,7 +475,13 @@ function PostDetailHeader({
       )}
 
       <View style={styles.actionRow}>
-        <Pressable style={styles.actionItem} onPress={onLike}>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.actionItem}
+          onPress={onLike}
+        >
           <Heart
             size={25}
             color={post.likedByMe ? colors.burgundy : colors.muted}
@@ -405,15 +489,33 @@ function PostDetailHeader({
           />
           <Text style={styles.actionText}>{post.likeCount}</Text>
         </Pressable>
-        <View style={styles.actionItem}>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.actionItem}
+          onPress={onComment}
+        >
           <MessageCircle size={25} color={colors.muted} />
           <Text style={styles.actionText}>{post.commentCount}</Text>
-        </View>
-        <Pressable style={styles.actionItem} onPress={onShare}>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.actionItem}
+          onPress={onShare}
+        >
           <Share2 size={24} color={colors.muted} />
           {post.shareCount > 0 ? <Text style={styles.actionText}>{post.shareCount}</Text> : null}
         </Pressable>
-        <Pressable style={styles.saveAction} onPress={onSave}>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.saveAction}
+          onPress={onSave}
+        >
           <Bookmark
             size={25}
             color={post.savedByMe ? colors.burgundy : colors.muted}
@@ -455,6 +557,7 @@ function PostDetailActionSheet({
   onShare,
   onSave,
   onRefresh,
+  onReport,
 }: {
   visible: boolean;
   post: Post | null;
@@ -462,12 +565,8 @@ function PostDetailActionSheet({
   onShare: () => void;
   onSave: () => void;
   onRefresh: () => void;
+  onReport: () => void;
 }) {
-  const reportPost = () => {
-    onClose();
-    Alert.alert("Signalement recu", "Cette publication sera examinee par DressMe.");
-  };
-
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
@@ -485,12 +584,233 @@ function PostDetailActionSheet({
           <Pressable style={styles.sheetOption} onPress={onRefresh}>
             <Text style={styles.sheetOptionText}>Actualiser</Text>
           </Pressable>
-          <Pressable style={styles.sheetOption} onPress={reportPost}>
+          <Pressable style={styles.sheetOption} onPress={onReport}>
             <Text style={[styles.sheetOptionText, styles.sheetOptionDanger]}>Signaler</Text>
           </Pressable>
           <Pressable style={[styles.sheetOption, styles.sheetCancel]} onPress={onClose}>
             <Text style={styles.sheetCancelText}>Annuler</Text>
           </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function PostDetailShareSheet({
+  visible,
+  post,
+  token,
+  currentUserId,
+  onClose,
+  onShared,
+  onExternalShare,
+}: {
+  visible: boolean;
+  post: Post | null;
+  token?: string;
+  currentUserId?: string;
+  onClose: () => void;
+  onShared: (post: Post) => void;
+  onExternalShare: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setQuery("");
+      setUsers([]);
+      setSelectedIds([]);
+      setSending(false);
+      return;
+    }
+
+    let mounted = true;
+    setLoading(true);
+    const loadUsers = async () => {
+      if (token && currentUserId) {
+        const following = await client.getFollowing(currentUserId, token);
+        if (following.length) {
+          return following;
+        }
+      }
+      return client.getChatUsers(token);
+    };
+
+    loadUsers()
+      .then((apiUsers) => {
+        if (mounted) {
+          setUsers(apiUsers);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setUsers([]);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentUserId, token, visible]);
+
+  const filteredUsers = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return users;
+    }
+    return users.filter((item) => {
+      const displayUser = toDisplayUser(item);
+      return `${displayUser.name} ${displayUser.username}`.toLowerCase().includes(normalizedQuery);
+    });
+  }, [query, users]);
+
+  const toggleRecipient = (userId: string) => {
+    setSelectedIds((current) =>
+      current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId],
+    );
+  };
+
+  const sendInternalShare = async () => {
+    if (!post || !token || selectedIds.length === 0 || sending) {
+      return;
+    }
+
+    const previousPost = post;
+    setSending(true);
+    onShared({ ...post, shareCount: post.shareCount + 1 });
+    try {
+      await Promise.all(
+        selectedIds.map(async (userId) => {
+          const conversation = await client.startConversation(userId, token);
+          await client.sendConversationMessage(
+            conversation.id,
+            {
+              kind: "shared_post",
+              body: JSON.stringify({
+                postId: post.id,
+                caption: post.caption,
+                mediaUrl: post.imageUrls[0] ?? "",
+              }),
+            },
+            token,
+          );
+        }),
+      );
+      const updatedPost = await client.sharePost(post.id, token);
+      onShared(updatedPost);
+      Vibration.vibrate(10);
+      Alert.alert("Envoye", `Publication envoyee a ${selectedIds.length} destinataire(s).`);
+      onClose();
+    } catch (error) {
+      onShared(previousPost);
+      Alert.alert(
+        "Envoi impossible",
+        error instanceof Error ? error.message : "Le partage interne a echoue.",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.shareSheet}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.shareHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Partager</Text>
+              <Text style={styles.shareSubtitle}>{post ? `@${toDisplayUser(post.author).username}` : "Publication DressMe"}</Text>
+            </View>
+            <Pressable style={styles.shareCloseButton} onPress={onClose}>
+              <Text style={styles.shareCloseText}>Fermer</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Rechercher un contact..."
+            placeholderTextColor={colors.muted}
+            style={styles.shareSearchInput}
+          />
+          {selectedIds.length ? (
+            <Text style={styles.shareSelectedText}>{selectedIds.length} selectionne(s)</Text>
+          ) : null}
+          {loading ? (
+            <View style={styles.shareState}>
+              <ActivityIndicator color={colors.burgundy} />
+              <Text style={styles.emptyText}>Chargement des contacts...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredUsers}
+              keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
+              style={styles.shareList}
+              renderItem={({ item }) => {
+                const displayUser = toDisplayUser(item);
+                const selected = selectedIds.includes(item.id);
+                return (
+                  <Pressable
+                    style={[styles.sharePersonRow, selected && styles.sharePersonSelected]}
+                    onPress={() => toggleRecipient(item.id)}
+                  >
+                    <Image source={{ uri: displayUser.avatar }} style={styles.shareAvatar} />
+                    <View style={styles.shareIdentity}>
+                      <Text style={styles.shareName}>{displayUser.name}</Text>
+                      <Text style={styles.shareMeta}>@{displayUser.username}</Text>
+                    </View>
+                    <Text style={[styles.shareChooseText, selected && styles.shareChooseTextActive]}>
+                      {selected ? "Selectionne" : "Choisir"}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.shareState}>
+                  <Text style={styles.emptyTitle}>Aucun contact</Text>
+                  <Text style={styles.emptyText}>Essaie une autre recherche.</Text>
+                </View>
+              }
+            />
+          )}
+          <View style={styles.shareActions}>
+            <Pressable
+              style={styles.shareExternalButton}
+              onPress={() => {
+                onClose();
+                onExternalShare();
+              }}
+            >
+              <Share2 size={17} color={colors.burgundy} />
+              <Text style={styles.shareExternalText}>Externe</Text>
+            </Pressable>
+            <Pressable
+              disabled={!selectedIds.length || sending || !token}
+              style={[
+                styles.shareSendButton,
+                (!selectedIds.length || sending || !token) && styles.shareSendButtonDisabled,
+              ]}
+              onPress={() => void sendInternalShare()}
+            >
+              {sending ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.shareSendText}>Envoyer</Text>
+              )}
+            </Pressable>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -694,8 +1014,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   actionItem: {
+    minWidth: 44,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
   },
   actionText: {
@@ -704,6 +1027,7 @@ const styles = StyleSheet.create({
   },
   saveAction: {
     marginLeft: "auto",
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -873,6 +1197,142 @@ const styles = StyleSheet.create({
   sheetCancelText: {
     color: colors.burgundy,
     fontWeight: "900",
+  },
+  shareSheet: {
+    maxHeight: "82%",
+    backgroundColor: colors.cream,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 22,
+    gap: 10,
+  },
+  shareHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  shareSubtitle: {
+    color: colors.muted,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  shareCloseButton: {
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  shareCloseText: {
+    color: colors.burgundy,
+    fontWeight: "900",
+  },
+  shareSearchInput: {
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.text,
+    paddingHorizontal: 15,
+    fontWeight: "700",
+  },
+  shareSelectedText: {
+    color: colors.burgundy,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  shareList: {
+    maxHeight: 330,
+  },
+  shareState: {
+    minHeight: 130,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  sharePersonRow: {
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
+  sharePersonSelected: {
+    borderColor: colors.burgundy,
+    backgroundColor: colors.roseLight,
+  },
+  shareAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.beige,
+  },
+  shareIdentity: {
+    flex: 1,
+  },
+  shareName: {
+    color: colors.text,
+    fontWeight: "900",
+  },
+  shareMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  shareChooseText: {
+    color: colors.muted,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  shareChooseTextActive: {
+    color: colors.burgundy,
+  },
+  shareActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  shareExternalButton: {
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  shareExternalText: {
+    color: colors.burgundy,
+    fontWeight: "900",
+  },
+  shareSendButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.burgundy,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shareSendButtonDisabled: {
+    opacity: 0.45,
+  },
+  shareSendText: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 15,
   },
   commentComposer: {
     minHeight: 64,

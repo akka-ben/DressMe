@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Home, Search, Send, User, Video } from "lucide-react-native";
 
 import { colors, fonts } from "../theme/dressme";
+import { touchHitSlop, touchRetentionOffset } from "../utils/touchTargets";
 
 export type AppTab = "feed" | "search" | "reels" | "messages" | "profile";
 
@@ -33,7 +34,9 @@ export function TabBar({ activeTab, onChange, messageBadgeCount = 0 }: Props) {
         return (
           <Pressable
             key={tab.key}
+            hitSlop={touchHitSlop}
             onPress={() => onChange(tab.key)}
+            pressRetentionOffset={touchRetentionOffset}
             style={[styles.tab, active && styles.activeTab]}
           >
             <View>

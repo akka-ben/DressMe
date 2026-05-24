@@ -206,6 +206,15 @@ export type AuthMessage = {
   message: string;
 };
 
+export type ReportPostInput = {
+  reasonKey: string;
+  reasonLabel: string;
+};
+
+export type ReportPostResult = {
+  message: string;
+};
+
 export type PostStats = {
   postId: string;
   likeCount: number;

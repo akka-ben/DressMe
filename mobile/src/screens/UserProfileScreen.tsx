@@ -13,6 +13,7 @@ import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
 import type { Post, Profile, User } from "../types/contracts";
 import { isOnline } from "../utils/onlineStatus";
+import { iconTouchHitSlop, touchHitSlop, touchRetentionOffset } from "../utils/touchTargets";
 import { Share } from "react-native";
 
 
@@ -130,13 +131,23 @@ export function UserProfileScreen({
     <View style={styles.shell}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={onBack}>
+        <Pressable
+          hitSlop={iconTouchHitSlop}
+          onPress={onBack}
+          pressRetentionOffset={touchRetentionOffset}
+          style={styles.backBtn}
+        >
           <ArrowLeft size={20} color={colors.burgundy} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           @{username}
         </Text>
-        <Pressable style={styles.shareBtn} onPress={() => void shareProfile()}>
+        <Pressable
+          hitSlop={iconTouchHitSlop}
+          onPress={() => void shareProfile()}
+          pressRetentionOffset={touchRetentionOffset}
+          style={styles.shareBtn}
+        >
           <Share2 size={18} color={colors.burgundy} />
         </Pressable>
       </View>
@@ -202,6 +213,8 @@ export function UserProfileScreen({
             {!isOwnProfile && (
               <View style={styles.actions}>
                 <Pressable
+                  hitSlop={touchHitSlop}
+                  pressRetentionOffset={touchRetentionOffset}
                   style={[
                     styles.followBtn,
                     isFollowActive && styles.followBtnActive,
@@ -230,6 +243,8 @@ export function UserProfileScreen({
                 </Pressable>
 
                 <Pressable
+                  hitSlop={touchHitSlop}
+                  pressRetentionOffset={touchRetentionOffset}
                   style={styles.msgBtn}
                   onPress={() => onMessage?.(userId)}
                 >
@@ -264,6 +279,8 @@ export function UserProfileScreen({
                 {suggestions.map((s) => (
                   <Pressable
                     key={s.id}
+                    hitSlop={touchHitSlop}
+                    pressRetentionOffset={touchRetentionOffset}
                     style={styles.suggestionItem}
                     onPress={() => onOpenProfile?.(s.id)}
                   >
@@ -302,6 +319,8 @@ export function UserProfileScreen({
               gridPosts.map((post) => (
                 <Pressable
                   key={post.id}
+                  hitSlop={touchHitSlop}
+                  pressRetentionOffset={touchRetentionOffset}
                   style={styles.tile}
                   onPress={() => onOpenPost?.(post.id)}
                 >
@@ -352,6 +371,8 @@ function TabButton({
 }) {
   return (
     <Pressable
+      hitSlop={touchHitSlop}
+      pressRetentionOffset={touchRetentionOffset}
       style={[styles.tab, active && styles.tabActive]}
       onPress={onPress}
     >

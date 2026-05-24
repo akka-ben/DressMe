@@ -49,6 +49,7 @@ import {
 } from "lucide-react-native";
 
 import { DressMeVideoPlayer } from "../components/DressMeVideoPlayer";
+import { PostReportModal } from "../components/PostReportModal";
 import {
   aiSuggestions,
   users as demoUsers,
@@ -117,12 +118,13 @@ type FeedStoryGroup = {
 
 type HomeFeedScreenProps = {
   onOpenPost?: (postId: string) => void;
+  onOpenComments?: (postId: string) => void;
   onOpenCreate?: () => void;
   onOpenLive?: (session: LiveSession) => void;
   onOpenProfile?: (userId: string) => void;
 };
 
-export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenProfile }: HomeFeedScreenProps) {
+export function HomeFeedScreen({ onOpenPost, onOpenComments, onOpenCreate, onOpenLive, onOpenProfile }: HomeFeedScreenProps) {
   const { token, user } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [liveSessions, setLiveSessions] = useState<LiveSession[]>([]);
@@ -139,8 +141,10 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
   const [feedError, setFeedError] = useState("");
   const [actionPost, setActionPost] = useState<FeedPost | null>(null);
   const [shareTargetPost, setShareTargetPost] = useState<FeedPost | null>(null);
+  const [reportTargetPost, setReportTargetPost] = useState<FeedPost | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const loadLockRef = useRef(false);
+  const postActionLocksRef = useRef(new Set<string>());
 
   const visiblePosts = useMemo(() => {
     if (activeFilter === "Tous") {
@@ -244,7 +248,19 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
   }, [fetchLiveSessions, token]);
 
   const toggleLike = useCallback((feedId: string) => {
+    const lockKey = `like:${feedId}`;
+    if (postActionLocksRef.current.has(lockKey)) {
+      return;
+    }
     const targetPost = posts.find((post) => post.feedId === feedId);
+    if (!token) {
+      Alert.alert("Connexion requise", "Connecte-toi pour aimer cette publication.");
+      return;
+    }
+    if (!targetPost) {
+      return;
+    }
+    postActionLocksRef.current.add(lockKey);
     setPosts((current) =>
       current.map((post) =>
         post.feedId === feedId
@@ -256,10 +272,6 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
           : post,
       ),
     );
-
-    if (!token || !targetPost) {
-      return;
-    }
 
     client
       .togglePostLike(targetPost.sourcePostId, token)
@@ -285,20 +297,31 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
               : post,
           ),
         );
+      })
+      .finally(() => {
+        postActionLocksRef.current.delete(lockKey);
       });
   }, [posts, token]);
 
   const toggleSave = useCallback((feedId: string) => {
+    const lockKey = `save:${feedId}`;
+    if (postActionLocksRef.current.has(lockKey)) {
+      return;
+    }
     const targetPost = posts.find((post) => post.feedId === feedId);
+    if (!token) {
+      Alert.alert("Connexion requise", "Connecte-toi pour enregistrer cette publication.");
+      return;
+    }
+    if (!targetPost) {
+      return;
+    }
+    postActionLocksRef.current.add(lockKey);
     setPosts((current) =>
       current.map((post) =>
         post.feedId === feedId ? { ...post, isSaved: !post.isSaved } : post,
       ),
     );
-
-    if (!token || !targetPost) {
-      return;
-    }
 
     client
       .togglePostSave(targetPost.sourcePostId, token)
@@ -318,6 +341,9 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
             post.feedId === feedId ? { ...post, isSaved: !post.isSaved } : post,
           ),
         );
+      })
+      .finally(() => {
+        postActionLocksRef.current.delete(lockKey);
       });
   }, [posts, token]);
 
@@ -427,6 +453,13 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
       <PostCard
         post={item}
         onOpen={() => onOpenPost?.(item.sourcePostId)}
+        onComment={() => {
+          if (onOpenComments) {
+            onOpenComments(item.sourcePostId);
+            return;
+          }
+          onOpenPost?.(item.sourcePostId);
+        }}
         onOpenProfile={() => onOpenProfile?.(item.author.id)}
         onHelp={() => setShowStylist(true)}
         onLike={() => toggleLike(item.feedId)}
@@ -436,7 +469,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
         onVote={(optionId) => votePoll(item.feedId, optionId)}
       />
     ),
-    [onOpenPost, onOpenProfile, toggleLike, toggleSave, votePoll],
+    [onOpenComments, onOpenPost, onOpenProfile, toggleLike, toggleSave, votePoll],
   );
 
   const markStoryAsViewed = useCallback((storyId: string, progressValue = 1) => {
@@ -502,6 +535,24 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
               feedId: item.feedId,
               selectedPollOptionId: item.selectedPollOptionId,
             }
+          : item,
+      ),
+    );
+  }, []);
+
+  const applyOptimisticShareUpdate = useCallback((feedId: string) => {
+    setPosts((current) =>
+      current.map((item) =>
+        item.feedId === feedId ? { ...item, shareCount: item.shareCount + 1 } : item,
+      ),
+    );
+  }, []);
+
+  const revertOptimisticShareUpdate = useCallback((feedId: string) => {
+    setPosts((current) =>
+      current.map((item) =>
+        item.feedId === feedId
+          ? { ...item, shareCount: Math.max(0, item.shareCount - 1) }
           : item,
       ),
     );
@@ -616,13 +667,29 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
             setActionPost(null);
           }
         }}
+        onReport={() => {
+          if (actionPost) {
+            setReportTargetPost(actionPost);
+            setActionPost(null);
+          }
+        }}
       />
       <SharePostSheet
         post={shareTargetPost}
         token={token ?? undefined}
+        currentUserId={user?.id}
         onClose={() => setShareTargetPost(null)}
+        onOptimisticShare={applyOptimisticShareUpdate}
+        onShareFailed={revertOptimisticShareUpdate}
         onShared={applySharedPostUpdate}
         onExternalShare={(post) => void sharePost(post)}
+      />
+      <PostReportModal
+        visible={Boolean(reportTargetPost)}
+        postId={reportTargetPost?.sourcePostId}
+        authorUsername={reportTargetPost?.author.username}
+        token={token ?? undefined}
+        onClose={() => setReportTargetPost(null)}
       />
     </View>
   );
@@ -970,6 +1037,7 @@ function isVideoUrl(url?: string): boolean {
 const PostCard = memo(function PostCard({
   post,
   onOpen,
+  onComment,
   onOpenProfile,
   onHelp,
   onLike,
@@ -980,6 +1048,7 @@ const PostCard = memo(function PostCard({
 }: {
   post: FeedPost;
   onOpen: () => void;
+  onComment: () => void;
   onOpenProfile: () => void;
   onHelp: () => void;
   onLike: () => void;
@@ -1122,29 +1191,53 @@ const PostCard = memo(function PostCard({
       ) : null}
 
       <View style={styles.actions}>
-        <Pressable style={styles.actionItem} onPress={onLike}>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.actionItem}
+          onPress={onLike}
+        >
           <Heart
-            size={21}
+            size={28}
             color={post.isLiked ? colors.burgundy : colors.muted}
             fill={post.isLiked ? colors.burgundy : "transparent"}
           />
           <Text style={styles.actionText}>{post.likes}</Text>
         </Pressable>
-        <Pressable style={styles.actionItem} onPress={onOpen}>
-          <MessageCircle size={21} color={colors.muted} />
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.actionItem}
+          onPress={onComment}
+        >
+          <MessageCircle size={28} color={colors.muted} />
           <Text style={styles.actionText}>{post.comments}</Text>
         </Pressable>
-        <Pressable style={styles.actionItem} onPress={onShare}>
-          <Share2 size={21} color={colors.muted} />
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          style={styles.actionItem}
+          onPress={onShare}
+        >
+          <Share2 size={28} color={colors.muted} />
           {post.shareCount > 0 ? <Text style={styles.actionText}>{post.shareCount}</Text> : null}
         </Pressable>
         <Pressable style={styles.helpButton} onPress={onHelp}>
-          <HelpCircle size={16} color={colors.burgundy} />
+          <HelpCircle size={28} color={colors.burgundy} />
           <Text style={styles.helpText}>Help Me Choose</Text>
         </Pressable>
-        <Pressable onPress={onSave} style={styles.saveButton}>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          pressRetentionOffset={14}
+          onPress={onSave}
+          style={styles.saveButton}
+        >
           <Bookmark
-            size={21}
+            size={28}
             color={post.isSaved ? colors.burgundy : colors.muted}
             fill={post.isSaved ? colors.burgundy : "transparent"}
           />
@@ -1168,6 +1261,7 @@ function PostActionSheet({
   onShare,
   onSave,
   onHide,
+  onReport,
 }: {
   post: FeedPost | null;
   onClose: () => void;
@@ -1175,6 +1269,7 @@ function PostActionSheet({
   onShare: () => void;
   onSave: () => void;
   onHide: () => void;
+  onReport: () => void;
 }) {
   const visible = Boolean(post);
   const sheetPanResponder = useMemo(
@@ -1189,11 +1284,6 @@ function PostActionSheet({
       }),
     [onClose],
   );
-
-  const reportPost = () => {
-    onClose();
-    Alert.alert("Signalement recu", "Cette publication sera examinee par DressMe.");
-  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -1217,7 +1307,7 @@ function PostActionSheet({
           <Pressable style={styles.sheetOption} onPress={onHide}>
             <Text style={styles.sheetOptionText}>Masquer cette publication</Text>
           </Pressable>
-          <Pressable style={styles.sheetOption} onPress={reportPost}>
+          <Pressable style={styles.sheetOption} onPress={onReport}>
             <Text style={[styles.sheetOptionText, styles.sheetOptionDanger]}>Signaler</Text>
           </Pressable>
           <Pressable style={[styles.sheetOption, styles.sheetCancel]} onPress={onClose}>
@@ -1232,13 +1322,19 @@ function PostActionSheet({
 function SharePostSheet({
   post,
   token,
+  currentUserId,
   onClose,
+  onOptimisticShare,
+  onShareFailed,
   onShared,
   onExternalShare,
 }: {
   post: FeedPost | null;
   token?: string;
+  currentUserId?: string;
   onClose: () => void;
+  onOptimisticShare: (feedId: string) => void;
+  onShareFailed: (feedId: string) => void;
   onShared: (post: Post, feedId: string) => void;
   onExternalShare: (post: FeedPost) => void;
 }) {
@@ -1272,8 +1368,17 @@ function SharePostSheet({
 
     let mounted = true;
     setLoading(true);
-    client
-      .getChatUsers(token)
+    const loadUsers = async () => {
+      if (token && currentUserId) {
+        const following = await client.getFollowing(currentUserId, token);
+        if (following.length) {
+          return following;
+        }
+      }
+      return client.getChatUsers(token);
+    };
+
+    loadUsers()
       .then((apiUsers) => {
         if (mounted) {
           setUsers(apiUsers.map(mapApiUserToAuthor));
@@ -1293,7 +1398,7 @@ function SharePostSheet({
     return () => {
       mounted = false;
     };
-  }, [token, visible]);
+  }, [currentUserId, token, visible]);
 
   const filteredUsers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -1319,6 +1424,7 @@ function SharePostSheet({
     }
 
     setSending(true);
+    onOptimisticShare(post.feedId);
     try {
       await Promise.all(
         selectedIds.map(async (userId) => {
@@ -1343,6 +1449,7 @@ function SharePostSheet({
       Alert.alert("Envoye", `Publication envoyee a ${selectedIds.length} destinataire(s).`);
       onClose();
     } catch (error) {
+      onShareFailed(post.feedId);
       Alert.alert(
         "Envoi impossible",
         error instanceof Error ? error.message : "Le partage interne a echoue.",
@@ -2674,15 +2781,18 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 13,
+    gap: 4,
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
   },
   actionItem: {
+    minWidth: 56,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    justifyContent: "center",
+    gap: 7,
   },
   actionText: {
     fontSize: 12,
@@ -2706,6 +2816,10 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginLeft: 2,
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
   },
   description: {
     paddingHorizontal: 12,

@@ -13,6 +13,7 @@ import { colors } from "../theme/dressme";
 type DressMeVideoPlayerProps = {
   uri: string;
   style: StyleProp<ViewStyle>;
+  pointerEvents?: "box-none" | "none" | "box-only" | "auto";
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
@@ -25,6 +26,7 @@ type DressMeVideoPlayerProps = {
 export function DressMeVideoPlayer({
   uri,
   style,
+  pointerEvents,
   autoPlay = false,
   loop = false,
   muted = false,
@@ -89,6 +91,7 @@ export function DressMeVideoPlayer({
     <VideoView
       player={player}
       style={style}
+      pointerEvents={pointerEvents}
       nativeControls={nativeControls}
       contentFit={contentFit}
       allowsVideoFrameAnalysis={false}

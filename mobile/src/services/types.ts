@@ -12,6 +12,8 @@ import type {
   Post,
   PostStats,
   Profile,
+  ReportPostInput,
+  ReportPostResult,
   SearchResults,
   Story,
   User,
@@ -60,6 +62,7 @@ export interface DressMeClient {
   togglePostLike(postId: string, token: string): Promise<Post>;
   sharePost(postId: string, token: string): Promise<Post>;
   togglePostSave(postId: string, token: string): Promise<Post>;
+  reportPost(postId: string, input: ReportPostInput, token: string): Promise<ReportPostResult>;
   getPostComments(postId: string, input?: { limit?: number; offset?: number }): Promise<Comment[]>;
   addPostComment(postId: string, content: string, token: string): Promise<Comment>;
   getSavedPosts(input: { token: string; mediaType?: "image" | "video"; limit?: number; offset?: number }): Promise<Post[]>;
