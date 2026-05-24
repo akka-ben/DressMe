@@ -690,7 +690,7 @@ async def list_post_comments(
 ) -> list[CommentDTO]:
     cursor = (
         db.comments.find({"post_id": post_id})
-        .sort("created_at", 1)
+        .sort("created_at", -1)
         .skip(offset)
         .limit(limit)
     )

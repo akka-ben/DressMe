@@ -233,7 +233,7 @@ class MessageDTO(BaseModel):
 
 
 class SendMessageInput(BaseModel):
-    kind: Literal["text", "image", "audio"] = "text"
+    kind: Literal["text", "image", "audio", "shared_post", "shared_ai_look"] = "text"
     body: str = Field(..., min_length=1, max_length=2_500_000)
 
 

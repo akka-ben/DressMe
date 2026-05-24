@@ -1,4 +1,4 @@
-import { useEvent } from "expo";
+import { useEvent, useEventListener } from "expo";
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import {
@@ -18,6 +18,8 @@ type DressMeVideoPlayerProps = {
   muted?: boolean;
   nativeControls?: boolean;
   contentFit?: VideoContentFit;
+  onEnd?: () => void;
+  onDurationChange?: (durationMs: number) => void;
 };
 
 export function DressMeVideoPlayer({
@@ -28,6 +30,8 @@ export function DressMeVideoPlayer({
   muted = false,
   nativeControls = true,
   contentFit = "cover",
+  onEnd,
+  onDurationChange,
 }: DressMeVideoPlayerProps) {
   const source = useMemo<VideoSource>(() => buildVideoSource(uri), [uri]);
   const [loadError, setLoadError] = useState("");
@@ -61,6 +65,16 @@ export function DressMeVideoPlayer({
       safelyConfigurePlayer(player, { autoPlay, loop, muted });
     }
   }, [autoPlay, loop, muted, player, statusChange.status]);
+
+  useEventListener(player, "playToEnd", () => {
+    onEnd?.();
+  });
+
+  useEventListener(player, "sourceLoad", ({ duration }) => {
+    if (Number.isFinite(duration) && duration > 0) {
+      onDurationChange?.(duration * 1000);
+    }
+  });
 
   if (!uri.trim() || loadError) {
     return (

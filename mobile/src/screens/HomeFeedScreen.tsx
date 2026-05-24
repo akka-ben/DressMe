@@ -9,10 +9,15 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  AppState,
   FlatList,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   ListRenderItem,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   RefreshControl,
@@ -20,6 +25,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -94,6 +100,9 @@ type FeedStory = {
   createdAt?: string;
   timestamp: string;
   viewed: boolean;
+  hasSeenStory: boolean;
+  lastSeenAt?: string;
+  progress: number;
   viewerCount: number;
   author: FeedAuthor;
 };
@@ -120,6 +129,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
   const [stories, setStories] = useState<FeedStoryGroup[]>([]);
   const [activeFilter, setActiveFilter] = useState("Tous");
   const [activeStoryGroup, setActiveStoryGroup] = useState<FeedStoryGroup | null>(null);
+  const [activeStoryStartIndex, setActiveStoryStartIndex] = useState<number | undefined>(undefined);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showStylist, setShowStylist] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -128,6 +138,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
   const [hasMore, setHasMore] = useState(true);
   const [feedError, setFeedError] = useState("");
   const [actionPost, setActionPost] = useState<FeedPost | null>(null);
+  const [shareTargetPost, setShareTargetPost] = useState<FeedPost | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const loadLockRef = useRef(false);
 
@@ -170,7 +181,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
     });
     setStories(
       apiStories.length
-        ? groupFeedStories(apiStories.map((story) => mapApiStory(story, user?.id)))
+        ? sortStoryGroups(groupFeedStories(apiStories.map((story) => mapApiStory(story, user?.id))))
         : [],
     );
   }, [token, user?.id]);
@@ -353,42 +364,34 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
   const votePoll = useCallback((feedId: string, optionId: string) => {
     setPosts((current) =>
       current.map((post) => {
-        if (post.feedId !== feedId || post.selectedPollOptionId) {
+        if (post.feedId !== feedId) {
           return post;
         }
 
+        const previousOptionId = post.selectedPollOptionId;
+        const shouldClearSelection = previousOptionId === optionId;
+
         return {
           ...post,
-          selectedPollOptionId: optionId,
-          pollOptions: post.pollOptions?.map((option) =>
-            option.id === optionId ? { ...option, votes: option.votes + 1 } : option,
-          ),
+          selectedPollOptionId: shouldClearSelection ? undefined : optionId,
+          pollOptions: post.pollOptions?.map((option) => {
+            if (option.id === previousOptionId) {
+              return { ...option, votes: Math.max(0, option.votes - 1) };
+            }
+            if (!shouldClearSelection && option.id === optionId) {
+              return { ...option, votes: option.votes + 1 };
+            }
+            return option;
+          }),
         };
       }),
     );
   }, []);
 
-  const openStoryGroup = useCallback((storyGroup: FeedStoryGroup) => {
+  const openStoryGroup = useCallback((storyGroup: FeedStoryGroup, startIndex?: number) => {
+    setActiveStoryStartIndex(startIndex);
     setActiveStoryGroup(storyGroup);
-    setStories((current) =>
-      current.map((item) =>
-        item.id === storyGroup.id
-          ? {
-              ...item,
-              viewed: true,
-              stories: item.stories.map((story, index) =>
-                index === 0 ? { ...story, viewed: true } : story,
-              ),
-            }
-          : item,
-      ),
-    );
-    const firstStory = storyGroup.stories[0];
-    const isOwnStory = storyGroup.userId === "me" || storyGroup.author.id === user?.id;
-    if (token && firstStory?.sourceStoryId && !isOwnStory) {
-      client.markStoryViewed(firstStory.sourceStoryId, token).catch(() => undefined);
-    }
-  }, [token, user?.id]);
+  }, []);
 
   const refreshFeed = useCallback(() => {
     setRefreshing(true);
@@ -428,27 +431,33 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
         onHelp={() => setShowStylist(true)}
         onLike={() => toggleLike(item.feedId)}
         onSave={() => toggleSave(item.feedId)}
-        onShare={() => void sharePost(item)}
+        onShare={() => setShareTargetPost(item)}
         onOpenMenu={() => setActionPost(item)}
         onVote={(optionId) => votePoll(item.feedId, optionId)}
       />
     ),
-    [onOpenPost, onOpenProfile, sharePost, toggleLike, toggleSave, votePoll],
+    [onOpenPost, onOpenProfile, toggleLike, toggleSave, votePoll],
   );
 
-  const markStoryAsViewed = useCallback((storyId: string) => {
+  const markStoryAsViewed = useCallback((storyId: string, progressValue = 1) => {
     setStories((current) => {
       let changed = false;
       const nextStories = current.map((group) => {
         let groupChanged = false;
         const groupStories = group.stories.map((story) => {
-          if (story.id !== storyId || story.viewed) {
+          if (story.id !== storyId) {
             return story;
           }
 
           changed = true;
           groupChanged = true;
-          return { ...story, viewed: true };
+          return {
+            ...story,
+            viewed: true,
+            hasSeenStory: true,
+            lastSeenAt: new Date().toISOString(),
+            progress: progressValue,
+          };
         });
 
         if (!groupChanged) {
@@ -458,13 +467,55 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
         return {
           ...group,
           stories: groupStories,
-          viewed: groupStories.every((story) => story.viewed),
+          viewed: groupStories.every(hasSeenStory),
         };
       });
 
-      return changed ? nextStories : current;
+      return changed ? sortStoryGroups(nextStories) : current;
     });
   }, []);
+
+  const saveStoryProgress = useCallback((storyId: string, progressValue: number) => {
+    setStories((current) =>
+      current.map((group) => ({
+        ...group,
+        stories: group.stories.map((story) =>
+          story.id === storyId
+            ? {
+                ...story,
+                lastSeenAt: new Date().toISOString(),
+                progress: Math.max(story.progress, Math.min(progressValue, 0.98)),
+              }
+            : story,
+        ),
+      })),
+    );
+  }, []);
+
+  const applySharedPostUpdate = useCallback((updatedPost: Post, feedId: string) => {
+    const mappedPost = mapApiPost(updatedPost);
+    setPosts((current) =>
+      current.map((item) =>
+        item.feedId === feedId
+          ? {
+              ...mappedPost,
+              feedId: item.feedId,
+              selectedPollOptionId: item.selectedPollOptionId,
+            }
+          : item,
+      ),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!activeStoryGroup) {
+      return;
+    }
+    const updatedGroup = stories.find((group) => group.id === activeStoryGroup.id);
+    if (updatedGroup && updatedGroup !== activeStoryGroup) {
+      setActiveStoryGroup(updatedGroup);
+    }
+  }, [activeStoryGroup, stories]);
 
   return (
     <View style={styles.shell}>
@@ -518,10 +569,18 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
 
       <StoryViewer
         storyGroup={activeStoryGroup}
+        storyGroups={stories}
+        initialStoryIndex={activeStoryStartIndex}
         token={token ?? undefined}
         currentUserId={user?.id}
         onViewedStory={markStoryAsViewed}
-        onClose={() => setActiveStoryGroup(null)}
+        onSaveProgress={saveStoryProgress}
+        onSwitchStoryGroup={openStoryGroup}
+        onOpenProfile={onOpenProfile}
+        onClose={() => {
+          setActiveStoryGroup(null);
+          setActiveStoryStartIndex(undefined);
+        }}
       />
       <NotificationsModal
         visible={showNotifications}
@@ -541,7 +600,7 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
         }}
         onShare={() => {
           if (actionPost) {
-            void sharePost(actionPost);
+            setShareTargetPost(actionPost);
             setActionPost(null);
           }
         }}
@@ -557,6 +616,13 @@ export function HomeFeedScreen({ onOpenPost, onOpenCreate, onOpenLive, onOpenPro
             setActionPost(null);
           }
         }}
+      />
+      <SharePostSheet
+        post={shareTargetPost}
+        token={token ?? undefined}
+        onClose={() => setShareTargetPost(null)}
+        onShared={applySharedPostUpdate}
+        onExternalShare={(post) => void sharePost(post)}
       />
     </View>
   );
@@ -763,6 +829,9 @@ function mapApiStory(story: Story, currentUserId?: string): FeedStory {
     createdAt: story.createdAt,
     timestamp: formatRelativeDate(story.createdAt),
     viewed: story.viewedByMe,
+    hasSeenStory: story.viewedByMe,
+    lastSeenAt: story.viewedByMe ? story.createdAt : undefined,
+    progress: story.viewedByMe ? 1 : 0,
     viewerCount: story.viewerCount,
     author,
   };
@@ -777,7 +846,7 @@ function groupFeedStories(stories: FeedStory[]): FeedStoryGroup[] {
 
     if (existingGroup) {
       existingGroup.stories.push(story);
-      existingGroup.viewed = existingGroup.stories.every((item) => item.viewed);
+      existingGroup.viewed = existingGroup.stories.every(hasSeenStory);
       return;
     }
 
@@ -786,25 +855,35 @@ function groupFeedStories(stories: FeedStory[]): FeedStoryGroup[] {
       userId: story.userId,
       author: story.author,
       stories: [story],
-      viewed: story.viewed,
+      viewed: hasSeenStory(story),
     });
   });
 
-  return [...groupsByUser.values()]
-    .map((group) => ({
-      ...group,
-      stories: [...group.stories].sort((left, right) => storyTimeMs(left) - storyTimeMs(right)),
-      viewed: group.stories.every((story) => story.viewed),
-    }))
+  return sortStoryGroups([...groupsByUser.values()]);
+}
+
+function sortStoryGroups(groups: FeedStoryGroup[]): FeedStoryGroup[] {
+  return groups
+    .map((group) => {
+      const sortedStories = [...group.stories].sort((left, right) => storyTimeMs(left) - storyTimeMs(right));
+      return {
+        ...group,
+        stories: sortedStories,
+        viewed: sortedStories.every(hasSeenStory),
+      };
+    })
     .sort((left, right) => {
-      if (left.userId === "me" && right.userId !== "me") {
-        return -1;
-      }
-      if (right.userId === "me" && left.userId !== "me") {
-        return 1;
+      const leftHasUnseen = left.stories.some((story) => !hasSeenStory(story));
+      const rightHasUnseen = right.stories.some((story) => !hasSeenStory(story));
+      if (leftHasUnseen !== rightHasUnseen) {
+        return leftHasUnseen ? -1 : 1;
       }
       return latestStoryTimeMs(right) - latestStoryTimeMs(left);
     });
+}
+
+function hasSeenStory(story: FeedStory): boolean {
+  return story.hasSeenStory || story.viewed;
 }
 
 function storyTimeMs(story: FeedStory): number {
@@ -913,6 +992,61 @@ const PostCard = memo(function PostCard({
   const user = post.author;
   const totalVotes = post.pollOptions?.reduce((sum, option) => sum + option.votes, 0) ?? 0;
   const isVideo = post.mediaType === "video" || isVideoUrl(post.image);
+  const lastTapRef = useRef(0);
+  const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(
+    () => () => {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const playDoubleTapHeart = useCallback(() => {
+    heartScale.setValue(0.25);
+    heartOpacity.setValue(1);
+    Animated.parallel([
+      Animated.spring(heartScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 130,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartOpacity, {
+        toValue: 0,
+        duration: 720,
+        delay: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [heartOpacity, heartScale]);
+
+  const handleMediaPress = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 280) {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+      lastTapRef.current = 0;
+      Vibration.vibrate(8);
+      playDoubleTapHeart();
+      if (!post.isLiked) {
+        onLike();
+      }
+      return;
+    }
+
+    lastTapRef.current = now;
+    singleTapTimeoutRef.current = setTimeout(() => {
+      onOpen();
+      singleTapTimeoutRef.current = null;
+    }, 290);
+  }, [onLike, onOpen, playDoubleTapHeart, post.isLiked]);
 
   return (
     <View style={styles.postCard}>
@@ -944,8 +1078,20 @@ const PostCard = memo(function PostCard({
           />
         </View>
       ) : (
-        <Pressable onPress={onOpen}>
+        <Pressable onPress={handleMediaPress}>
           <Image source={{ uri: post.image }} style={styles.postImage} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.postDoubleTapHeart,
+              {
+                opacity: heartOpacity,
+                transform: [{ scale: heartScale }],
+              },
+            ]}
+          >
+            <Heart size={92} color={colors.white} fill={colors.white} />
+          </Animated.View>
         </Pressable>
       )}
 
@@ -1031,6 +1177,18 @@ function PostActionSheet({
   onHide: () => void;
 }) {
   const visible = Boolean(post);
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 22 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 70 || gesture.vy > 1.1) {
+            onClose();
+          }
+        },
+      }),
+    [onClose],
+  );
 
   const reportPost = () => {
     onClose();
@@ -1040,7 +1198,7 @@ function PostActionSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.actionSheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.actionSheet}>
+        <Pressable style={styles.actionSheet} {...sheetPanResponder.panHandlers}>
           <View style={styles.actionSheetHandle} />
           <Text style={styles.actionSheetTitle}>
             {post ? `@${post.author.username}` : "Publication"}
@@ -1065,6 +1223,224 @@ function PostActionSheet({
           <Pressable style={[styles.sheetOption, styles.sheetCancel]} onPress={onClose}>
             <Text style={styles.sheetCancelText}>Annuler</Text>
           </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function SharePostSheet({
+  post,
+  token,
+  onClose,
+  onShared,
+  onExternalShare,
+}: {
+  post: FeedPost | null;
+  token?: string;
+  onClose: () => void;
+  onShared: (post: Post, feedId: string) => void;
+  onExternalShare: (post: FeedPost) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<FeedAuthor[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const visible = Boolean(post);
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 22 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 70 || gesture.vy > 1.1) {
+            onClose();
+          }
+        },
+      }),
+    [onClose],
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      setQuery("");
+      setUsers([]);
+      setSelectedIds([]);
+      setSending(false);
+      return;
+    }
+
+    let mounted = true;
+    setLoading(true);
+    client
+      .getChatUsers(token)
+      .then((apiUsers) => {
+        if (mounted) {
+          setUsers(apiUsers.map(mapApiUserToAuthor));
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setUsers(demoMentionFollowers());
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [token, visible]);
+
+  const filteredUsers = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return users;
+    }
+    return users.filter((item) =>
+      `${item.name} ${item.username}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [query, users]);
+
+  const toggleRecipient = (userId: string) => {
+    setSelectedIds((current) =>
+      current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId],
+    );
+  };
+
+  const sendInternalShare = async () => {
+    if (!post || !token || selectedIds.length === 0 || sending) {
+      return;
+    }
+
+    setSending(true);
+    try {
+      await Promise.all(
+        selectedIds.map(async (userId) => {
+          const conversation = await client.startConversation(userId, token);
+          await client.sendConversationMessage(
+            conversation.id,
+            {
+              kind: "shared_post",
+              body: JSON.stringify({
+                postId: post.sourcePostId,
+                caption: post.description,
+                mediaUrl: post.image,
+              }),
+            },
+            token,
+          );
+        }),
+      );
+      const updatedPost = await client.sharePost(post.sourcePostId, token);
+      onShared(updatedPost, post.feedId);
+      Vibration.vibrate(10);
+      Alert.alert("Envoye", `Publication envoyee a ${selectedIds.length} destinataire(s).`);
+      onClose();
+    } catch (error) {
+      Alert.alert(
+        "Envoi impossible",
+        error instanceof Error ? error.message : "Le partage interne a echoue.",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.storySheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.shareSheet} {...sheetPanResponder.panHandlers}>
+          <View style={styles.actionSheetHandle} />
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Partager</Text>
+              <Text style={styles.storySheetSubtitle}>
+                {post ? `@${post.author.username}` : "Publication DressMe"}
+              </Text>
+            </View>
+            <SheetCloseButton onClose={onClose} />
+          </View>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Rechercher un contact..."
+            placeholderTextColor={colors.muted}
+            style={styles.shareSearchInput}
+          />
+          {selectedIds.length ? (
+            <Text style={styles.shareSelectedText}>{selectedIds.length} selectionne(s)</Text>
+          ) : null}
+          {loading ? (
+            <View style={styles.storySheetState}>
+              <ActivityIndicator color={colors.burgundy} />
+              <Text style={styles.emptyText}>Chargement des contacts...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredUsers}
+              keyExtractor={(item) => item.id}
+              style={styles.shareList}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => {
+                const selected = selectedIds.includes(item.id);
+                return (
+                  <Pressable
+                    style={[styles.storyPersonRow, selected && styles.shareRecipientSelected]}
+                    onPress={() => toggleRecipient(item.id)}
+                  >
+                    <Image source={{ uri: item.avatar }} style={styles.storyPersonAvatar} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.storyPersonName}>{item.name}</Text>
+                      <Text style={styles.storyPersonMeta}>@{item.username}</Text>
+                    </View>
+                    <Text style={[styles.mentionAction, selected && styles.shareRecipientText]}>
+                      {selected ? "Selectionne" : "Choisir"}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.storySheetState}>
+                  <Text style={styles.emptyTitle}>Aucun contact</Text>
+                  <Text style={styles.emptyText}>Essaie une autre recherche.</Text>
+                </View>
+              }
+            />
+          )}
+          <View style={styles.shareActions}>
+            <Pressable
+              style={styles.shareExternalButton}
+              onPress={() => {
+                if (post) {
+                  onClose();
+                  onExternalShare(post);
+                }
+              }}
+            >
+              <Share2 size={17} color={colors.burgundy} />
+              <Text style={styles.shareExternalText}>Externe</Text>
+            </Pressable>
+            <Pressable
+              disabled={!selectedIds.length || sending || !token}
+              style={[
+                styles.shareSendButton,
+                (!selectedIds.length || sending || !token) && styles.shareSendButtonDisabled,
+              ]}
+              onPress={() => void sendInternalShare()}
+            >
+              {sending ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.shareSendText}>Envoyer</Text>
+              )}
+            </Pressable>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -1112,15 +1488,25 @@ function FeedStatus({
 
 function StoryViewer({
   storyGroup,
+  storyGroups,
+  initialStoryIndex,
   token,
   currentUserId,
   onViewedStory,
+  onSaveProgress,
+  onSwitchStoryGroup,
+  onOpenProfile,
   onClose,
 }: {
   storyGroup: FeedStoryGroup | null;
+  storyGroups: FeedStoryGroup[];
+  initialStoryIndex?: number;
   token?: string;
   currentUserId?: string;
-  onViewedStory: (storyId: string) => void;
+  onViewedStory: (storyId: string, progress?: number) => void;
+  onSaveProgress: (storyId: string, progress: number) => void;
+  onSwitchStoryGroup: (storyGroup: FeedStoryGroup, startIndex?: number) => void;
+  onOpenProfile?: (userId: string) => void;
   onClose: () => void;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -1134,32 +1520,80 @@ function StoryViewer({
   const [followers, setFollowers] = useState<FeedAuthor[]>([]);
   const [loadingViewers, setLoadingViewers] = useState(false);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [sharingStoryUserId, setSharingStoryUserId] = useState<string | null>(null);
+  const [replyFocused, setReplyFocused] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [appActive, setAppActive] = useState(true);
+  const [holding, setHolding] = useState(false);
+  const [gesturePaused, setGesturePaused] = useState(false);
+  const [storyDurationMs, setStoryDurationMs] = useState<number | null>(null);
   const progressRef = useRef(0);
   const markedStoryIdsRef = useRef(new Set<string>());
+  const likedStoryIdsRef = useRef(new Set<string>());
+  const storyLikeScale = useRef(new Animated.Value(0)).current;
+  const storyLikeOpacity = useRef(new Animated.Value(0)).current;
   const stories = storyGroup?.stories ?? [];
   const activeStory = stories[activeIndex] ?? null;
+  const storyGroupIndex = storyGroup ? storyGroups.findIndex((item) => item.id === storyGroup.id) : -1;
 
   const isOwnStory = Boolean(storyGroup && (storyGroup.userId === "me" || storyGroup.author.id === currentUserId));
-  const timerPaused = showViewers || showMentions || showSendTargets;
+  const timerPaused =
+    showViewers ||
+    showMentions ||
+    showSendTargets ||
+    replyFocused ||
+    keyboardVisible ||
+    !appActive ||
+    holding ||
+    gesturePaused;
 
   useEffect(() => {
-    const firstUnseenIndex = storyGroup?.stories.findIndex((item) => !item.viewed) ?? -1;
+    const storiesCount = storyGroup?.stories.length ?? 0;
+    if (!storiesCount) {
+      setActiveIndex(0);
+      return;
+    }
+    if (typeof initialStoryIndex === "number") {
+      setActiveIndex(Math.min(Math.max(initialStoryIndex, 0), storiesCount - 1));
+      return;
+    }
+    const firstUnseenIndex = storyGroup?.stories.findIndex((item) => !hasSeenStory(item)) ?? -1;
     setActiveIndex(firstUnseenIndex >= 0 ? firstUnseenIndex : 0);
-  }, [storyGroup?.id]);
+  }, [initialStoryIndex, storyGroup?.id, storyGroup?.stories.length]);
 
   useEffect(() => {
-    progressRef.current = 0;
-    setProgress(0);
+    const restoredProgress = activeStory && !hasSeenStory(activeStory) ? activeStory.progress : 0;
+    progressRef.current = Math.min(restoredProgress, 0.98);
+    setProgress(progressRef.current);
     setReply("");
-    setLiked(false);
+    setLiked(activeStory ? likedStoryIdsRef.current.has(activeStory.id) : false);
+    setStoryDurationMs(null);
+    setReplyFocused(false);
     setShowViewers(false);
     setShowMentions(false);
     setShowSendTargets(false);
     setViewers([]);
     setFollowers([]);
+    setSendingReply(false);
+    setSharingStoryUserId(null);
   }, [activeStory?.id]);
 
   useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardWillShow", () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener("keyboardWillHide", () => setKeyboardVisible(false));
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      setAppActive(state === "active");
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+      appStateSubscription.remove();
+    };
+  }, []);
+
+  const markActiveStoryViewed = useCallback(() => {
     if (!activeStory) {
       return;
     }
@@ -1168,38 +1602,98 @@ function StoryViewer({
     }
 
     markedStoryIdsRef.current.add(activeStory.id);
-    onViewedStory(activeStory.id);
+    onViewedStory(activeStory.id, 1);
     if (token && activeStory.sourceStoryId && !isOwnStory) {
       client.markStoryViewed(activeStory.sourceStoryId, token).catch(() => undefined);
     }
-  }, [activeStory?.id, activeStory?.sourceStoryId, isOwnStory, onViewedStory, token]);
+  }, [activeStory, isOwnStory, onViewedStory, token]);
+
+  const closeViewer = useCallback(() => {
+    if (activeStory) {
+      if (progressRef.current >= 0.98) {
+        markActiveStoryViewed();
+      } else {
+        onSaveProgress(activeStory.id, progressRef.current);
+      }
+    }
+    onClose();
+  }, [activeStory, markActiveStoryViewed, onClose, onSaveProgress]);
+
+  const goToNextUser = useCallback(() => {
+    if (!storyGroup || storyGroupIndex < 0) {
+      return;
+    }
+    const nextGroup = storyGroups[storyGroupIndex + 1];
+    if (nextGroup) {
+      onSwitchStoryGroup(nextGroup);
+      return;
+    }
+    closeViewer();
+  }, [closeViewer, onSwitchStoryGroup, storyGroup, storyGroupIndex, storyGroups]);
+
+  const goToPreviousUser = useCallback(() => {
+    if (!storyGroup || storyGroupIndex <= 0) {
+      progressRef.current = 0;
+      setProgress(0);
+      return;
+    }
+    const previousGroup = storyGroups[storyGroupIndex - 1];
+    if (previousGroup) {
+      onSwitchStoryGroup(previousGroup, Math.max(0, previousGroup.stories.length - 1));
+    }
+  }, [onSwitchStoryGroup, storyGroup, storyGroupIndex, storyGroups]);
 
   const goToNextStory = useCallback(() => {
     if (!storyGroup) {
       return;
     }
+    markActiveStoryViewed();
     if (activeIndex < storyGroup.stories.length - 1) {
       setActiveIndex((current) => current + 1);
       return;
     }
-    onClose();
-  }, [activeIndex, onClose, storyGroup]);
+    goToNextUser();
+  }, [activeIndex, goToNextUser, markActiveStoryViewed, storyGroup]);
 
   const goToPreviousStory = useCallback(() => {
     if (activeIndex > 0) {
       setActiveIndex((current) => current - 1);
       return;
     }
-    progressRef.current = 0;
-    setProgress(0);
-  }, [activeIndex]);
+    goToPreviousUser();
+  }, [activeIndex, goToPreviousUser]);
+
+  const storyPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 24 || Math.abs(gesture.dy) > 28,
+        onPanResponderGrant: () => setGesturePaused(true),
+        onPanResponderRelease: (_, gesture) => {
+          setGesturePaused(false);
+          if (gesture.dy > 110 && Math.abs(gesture.dy) > Math.abs(gesture.dx)) {
+            closeViewer();
+            return;
+          }
+          if (gesture.dx < -55 && Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
+            goToNextUser();
+            return;
+          }
+          if (gesture.dx > 55 && Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
+            goToPreviousUser();
+          }
+        },
+        onPanResponderTerminate: () => setGesturePaused(false),
+      }),
+    [closeViewer, goToNextUser, goToPreviousUser],
+  );
 
   useEffect(() => {
     if (!activeStory || timerPaused) {
       return undefined;
     }
 
-    const durationMs = activeStory.mediaType === "video" ? 15000 : 8000;
+    const durationMs = activeStory.mediaType === "video" ? storyDurationMs ?? 15000 : 8000;
     const startedAt = Date.now() - progressRef.current * durationMs;
     const interval = setInterval(() => {
       const nextProgress = Math.min(1, (Date.now() - startedAt) / durationMs);
@@ -1212,7 +1706,7 @@ function StoryViewer({
     }, 80);
 
     return () => clearInterval(interval);
-  }, [activeStory, goToNextStory, timerPaused]);
+  }, [activeStory, goToNextStory, storyDurationMs, timerPaused]);
 
   const loadViewers = async () => {
     if (!activeStory?.sourceStoryId || !token) {
@@ -1236,10 +1730,15 @@ function StoryViewer({
     }
   };
 
-  const loadFollowerCandidates = async () => {
+  const loadFollowerCandidates = async (scope: "followers" | "following" = "followers") => {
     setLoadingFollowers(true);
     try {
-      const apiFollowers = token ? await client.getFollowers(token) : [];
+      const apiFollowers =
+        token && currentUserId
+          ? scope === "following"
+            ? await client.getFollowing(currentUserId, token)
+            : await client.getFollowers(token)
+          : [];
       setFollowers(apiFollowers.length ? apiFollowers.map(mapApiUserToAuthor) : demoMentionFollowers());
     } catch {
       setFollowers(demoMentionFollowers());
@@ -1250,21 +1749,86 @@ function StoryViewer({
 
   const openMentionSheet = async () => {
     setShowMentions(true);
-    await loadFollowerCandidates();
+    await loadFollowerCandidates("followers");
   };
 
   const openSendSheet = async () => {
     setShowSendTargets(true);
-    await loadFollowerCandidates();
+    await loadFollowerCandidates("following");
   };
 
-  const sendReply = () => {
-    if (!reply.trim()) {
+  const openStoryProfile = () => {
+    if (!storyGroup?.author.id) {
       return;
     }
-    Alert.alert("Message envoye", "Ta reponse a la story a ete preparee.");
-    setReply("");
-    onClose();
+    closeViewer();
+    onOpenProfile?.(storyGroup.author.id);
+  };
+
+  const toggleStoryLike = () => {
+    if (!activeStory) {
+      return;
+    }
+    const nextLiked = !likedStoryIdsRef.current.has(activeStory.id);
+    if (nextLiked) {
+      likedStoryIdsRef.current.add(activeStory.id);
+      Vibration.vibrate(8);
+      storyLikeScale.setValue(0.35);
+      storyLikeOpacity.setValue(1);
+      Animated.parallel([
+        Animated.spring(storyLikeScale, {
+          toValue: 1.15,
+          friction: 5,
+          tension: 110,
+          useNativeDriver: true,
+        }),
+        Animated.timing(storyLikeOpacity, {
+          toValue: 0,
+          duration: 720,
+          delay: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      likedStoryIdsRef.current.delete(activeStory.id);
+    }
+    setLiked(nextLiked);
+  };
+
+  const sendReply = async () => {
+    const content = reply.trim();
+    if (!content || sendingReply) {
+      return;
+    }
+
+    if (!token || !storyGroup?.author.id) {
+      Alert.alert("Connexion requise", "Connecte-toi pour envoyer un message.");
+      return;
+    }
+
+    setSendingReply(true);
+    try {
+      const conversation = await client.startConversation(storyGroup.author.id, token);
+      await client.sendConversationMessage(
+        conversation.id,
+        {
+          kind: "text",
+          body: `Reponse a votre story: ${content}`,
+        },
+        token,
+      );
+      Vibration.vibrate(10);
+      Keyboard.dismiss();
+      setReply("");
+      setReplyFocused(false);
+    } catch (error) {
+      Alert.alert(
+        "Message non envoye",
+        error instanceof Error ? error.message : "Impossible d'envoyer le message.",
+      );
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   const mentionFollower = (follower: FeedAuthor) => {
@@ -1272,9 +1836,33 @@ function StoryViewer({
     setShowMentions(false);
   };
 
-  const sendStoryTo = (follower: FeedAuthor) => {
-    Alert.alert("Story envoyee", `Ta story a ete envoyee a @${follower.username}.`);
-    setShowSendTargets(false);
+  const sendStoryTo = async (follower: FeedAuthor) => {
+    if (!token || !activeStory) {
+      Alert.alert("Connexion requise", "Connecte-toi pour partager cette story.");
+      return;
+    }
+
+    setSharingStoryUserId(follower.id);
+    try {
+      const conversation = await client.startConversation(follower.id, token);
+      await client.sendConversationMessage(
+        conversation.id,
+        {
+          kind: "text",
+          body: `Story partagee depuis DressMe: ${activeStory.image}`,
+        },
+        token,
+      );
+      Vibration.vibrate(10);
+      setShowSendTargets(false);
+    } catch (error) {
+      Alert.alert(
+        "Story non envoyee",
+        error instanceof Error ? error.message : "Impossible de partager cette story.",
+      );
+    } finally {
+      setSharingStoryUserId(null);
+    }
   };
 
   if (!storyGroup || !activeStory) {
@@ -1287,23 +1875,49 @@ function StoryViewer({
   const progressWidth = `${Math.round(progress * 100)}%` as `${number}%`;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.storyModal}>
+    <Modal visible transparent animationType="fade" onRequestClose={closeViewer}>
+      <View style={styles.storyModal} {...storyPanResponder.panHandlers}>
         {activeStoryIsVideo ? (
           <DressMeVideoPlayer
             uri={activeStory.image}
             style={styles.storyFullImage}
-            autoPlay
+            autoPlay={!timerPaused}
             nativeControls={false}
             contentFit="contain"
+            onEnd={goToNextStory}
+            onDurationChange={(durationMs) => setStoryDurationMs(Math.max(1000, durationMs))}
           />
         ) : (
           <Image source={{ uri: activeStory.image }} style={styles.storyFullImage} />
         )}
         <View style={styles.storyTapLayer} pointerEvents="box-none">
-          <Pressable style={styles.storyTapLeft} onPress={goToPreviousStory} />
-          <Pressable style={styles.storyTapRight} onPress={goToNextStory} />
+          <Pressable
+            style={styles.storyTapLeft}
+            onPress={goToPreviousStory}
+            onPressIn={() => setHolding(true)}
+            onPressOut={() => setHolding(false)}
+            onLongPress={() => setHolding(true)}
+          />
+          <Pressable
+            style={styles.storyTapRight}
+            onPress={goToNextStory}
+            onPressIn={() => setHolding(true)}
+            onPressOut={() => setHolding(false)}
+            onLongPress={() => setHolding(true)}
+          />
         </View>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.storyLikeFeedback,
+            {
+              opacity: storyLikeOpacity,
+              transform: [{ scale: storyLikeScale }],
+            },
+          ]}
+        >
+          <Heart size={98} color={colors.white} fill={liked ? colors.white : colors.burgundy} />
+        </Animated.View>
 
         <LinearGradient colors={["rgba(0,0,0,0.88)", "rgba(0,0,0,0.18)", "transparent"]} style={styles.storyTopOverlay}>
           <View style={styles.storyProgressRow}>
@@ -1322,11 +1936,13 @@ function StoryViewer({
             })}
           </View>
           <View style={styles.storyViewerHeader}>
-            <Image source={{ uri: user.avatar }} style={styles.storyViewerAvatar} />
-            <View style={styles.storyHeaderText}>
+            <Pressable style={styles.storyProfilePressable} onPress={openStoryProfile}>
+              <Image source={{ uri: user.avatar }} style={styles.storyViewerAvatar} />
+            </Pressable>
+            <Pressable style={styles.storyHeaderText} onPress={openStoryProfile}>
               <Text style={styles.storyViewerName}>{isOwnStory ? "Your story" : user.name}</Text>
               <Text style={styles.storyViewerTime}>{activeStoryTimestamp}</Text>
-            </View>
+            </Pressable>
             {isOwnStory ? (
               <Pressable style={styles.storyHeaderIcon} onPress={() => Alert.alert("Options", "Options de story a connecter dans la phase suivante.")}>
                 <MoreHorizontal size={25} color={colors.white} />
@@ -1335,7 +1951,7 @@ function StoryViewer({
             <Pressable
               accessibilityRole="button"
               hitSlop={12}
-              onPressIn={onClose}
+              onPressIn={closeViewer}
               pressRetentionOffset={16}
               style={styles.storyHeaderIcon}
             >
@@ -1344,58 +1960,86 @@ function StoryViewer({
           </View>
         </LinearGradient>
 
-        <LinearGradient colors={["transparent", "rgba(0,0,0,0.88)"]} style={styles.storyBottomOverlay}>
-          {isOwnStory ? (
-            <View style={styles.ownerStoryActions}>
-              <StoryOwnerAction
-                icon={<Eye size={22} color={colors.white} />}
-                label="Activite"
-                subLabel={`${activeStory.viewerCount} vues`}
-                onPress={() => void loadViewers()}
-              />
-              <StoryOwnerAction
-                icon={<Share2 size={22} color={colors.white} />}
-                label="Partager"
-                onPress={() => void Share.share({ message: activeStory.image, url: activeStory.image })}
-              />
-              <StoryOwnerAction
-                icon={<AtSign size={24} color={colors.white} />}
-                label="Mention"
-                onPress={() => void openMentionSheet()}
-              />
-              <StoryOwnerAction
-                icon={<Send size={23} color={colors.white} />}
-                label="Envoyer"
-                onPress={() => void openSendSheet()}
-              />
-              <StoryOwnerAction
-                icon={<MoreHorizontal size={24} color={colors.white} />}
-                label="Plus"
-                onPress={() => Alert.alert("Plus", "Options supplementaires de story.")}
-              />
-            </View>
-          ) : (
-            <View style={styles.storyReply}>
-              <TextInput
-                value={reply}
-                onChangeText={setReply}
-                placeholder="Envoyer un message..."
-                placeholderTextColor="#d8d0ca"
-                style={styles.storyInput}
-              />
-              <Pressable onPress={() => setLiked((current) => !current)}>
-                <Heart
-                  size={27}
-                  color={colors.white}
-                  fill={liked ? colors.white : "transparent"}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          pointerEvents="box-none"
+          style={styles.storyBottomKeyboard}
+        >
+          <LinearGradient colors={["transparent", "rgba(0,0,0,0.88)"]} style={styles.storyBottomOverlay}>
+            {isOwnStory ? (
+              <View style={styles.ownerStoryActions}>
+                <StoryOwnerAction
+                  icon={<Eye size={22} color={colors.white} />}
+                  label="Activite"
+                  subLabel={`${activeStory.viewerCount} vues`}
+                  onPress={() => void loadViewers()}
                 />
-              </Pressable>
-              <Pressable onPress={sendReply}>
-                <Send size={28} color={colors.white} />
-              </Pressable>
-            </View>
-          )}
-        </LinearGradient>
+                <StoryOwnerAction
+                  icon={<Share2 size={22} color={colors.white} />}
+                  label="Partager"
+                  onPress={() => void Share.share({ message: activeStory.image, url: activeStory.image })}
+                />
+                <StoryOwnerAction
+                  icon={<AtSign size={24} color={colors.white} />}
+                  label="Mention"
+                  onPress={() => void openMentionSheet()}
+                />
+                <StoryOwnerAction
+                  icon={<Send size={23} color={colors.white} />}
+                  label="Envoyer"
+                  onPress={() => void openSendSheet()}
+                />
+                <StoryOwnerAction
+                  icon={<MoreHorizontal size={24} color={colors.white} />}
+                  label="Plus"
+                  onPress={() => Alert.alert("Plus", "Options supplementaires de story.")}
+                />
+              </View>
+            ) : (
+              <View style={styles.storyReply}>
+                <View style={styles.storyInputWrap}>
+                  <TextInput
+                    value={reply}
+                    onChangeText={setReply}
+                    onFocus={() => setReplyFocused(true)}
+                    onBlur={() => setReplyFocused(false)}
+                    placeholder="Envoyer un message..."
+                    placeholderTextColor="#d8d0ca"
+                    style={[styles.storyInput, reply.trim() && styles.storyInputWithSend]}
+                  />
+                  {reply.trim() || sendingReply ? (
+                    <Pressable
+                      disabled={sendingReply}
+                      hitSlop={8}
+                      style={styles.storyInputSendButton}
+                      onPress={() => void sendReply()}
+                    >
+                      {sendingReply ? (
+                        <ActivityIndicator size="small" color={colors.white} />
+                      ) : (
+                        <Send size={18} color={colors.white} />
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Pressable hitSlop={12} style={styles.storyRoundAction} onPress={toggleStoryLike}>
+                  <Heart
+                    size={27}
+                    color={liked ? colors.burgundy : colors.white}
+                    fill={liked ? colors.burgundy : "transparent"}
+                  />
+                </Pressable>
+                <Pressable
+                  hitSlop={12}
+                  style={styles.storyRoundAction}
+                  onPress={() => void openSendSheet()}
+                >
+                  <Send size={28} color={colors.white} />
+                </Pressable>
+              </View>
+            )}
+          </LinearGradient>
+        </KeyboardAvoidingView>
 
         <StoryViewersSheet
           visible={showViewers}
@@ -1417,11 +2061,12 @@ function StoryViewer({
         <StoryMentionSheet
           visible={showSendTargets}
           title="Envoyer a"
-          subtitle="Choisir les destinataires"
+          subtitle="Choisir parmi tes abonnements"
           actionLabel="Envoyer"
-          loadingText="Chargement des destinataires..."
+          loadingText="Chargement des abonnements..."
           followers={followers}
           loading={loadingFollowers}
+          busyUserId={sharingStoryUserId}
           onSelect={sendStoryTo}
           onClose={() => setShowSendTargets(false)}
         />
@@ -1477,10 +2122,23 @@ function StoryViewersSheet({
   loading: boolean;
   onClose: () => void;
 }) {
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 22 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 70 || gesture.vy > 1.1) {
+            onClose();
+          }
+        },
+      }),
+    [onClose],
+  );
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.storySheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.storySheet}>
+        <Pressable style={styles.storySheet} {...sheetPanResponder.panHandlers}>
           <View style={styles.actionSheetHandle} />
           <View style={styles.sheetHeader}>
             <View>
@@ -1525,6 +2183,7 @@ function StoryMentionSheet({
   loadingText,
   followers,
   loading,
+  busyUserId,
   onSelect,
   onClose,
 }: {
@@ -1535,13 +2194,27 @@ function StoryMentionSheet({
   loadingText: string;
   followers: FeedAuthor[];
   loading: boolean;
+  busyUserId?: string | null;
   onSelect: (follower: FeedAuthor) => void;
   onClose: () => void;
 }) {
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 22 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderRelease: (_, gesture) => {
+          if (gesture.dy > 70 || gesture.vy > 1.1) {
+            onClose();
+          }
+        },
+      }),
+    [onClose],
+  );
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.storySheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.storySheet}>
+        <Pressable style={styles.storySheet} {...sheetPanResponder.panHandlers}>
           <View style={styles.actionSheetHandle} />
           <View style={styles.sheetHeader}>
             <View>
@@ -1568,7 +2241,11 @@ function StoryMentionSheet({
                   <Text style={styles.storyPersonName}>{follower.name}</Text>
                   <Text style={styles.storyPersonMeta}>@{follower.username}</Text>
                 </View>
-                <Text style={styles.mentionAction}>{actionLabel}</Text>
+                {busyUserId === follower.id ? (
+                  <ActivityIndicator size="small" color={colors.burgundy} />
+                ) : (
+                  <Text style={styles.mentionAction}>{actionLabel}</Text>
+                )}
               </Pressable>
             ))
           )}
@@ -1922,6 +2599,14 @@ const styles = StyleSheet.create({
     height: 320,
     backgroundColor: colors.beige,
   },
+  postDoubleTapHeart: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 112,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   feedVideoFrame: {
     width: "100%",
     height: 320,
@@ -2076,12 +2761,22 @@ const styles = StyleSheet.create({
     top: 140,
     bottom: 150,
     flexDirection: "row",
+    zIndex: 5,
   },
   storyTapLeft: {
     flex: 1,
   },
   storyTapRight: {
     flex: 1,
+  },
+  storyLikeFeedback: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: "42%",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
   },
   storyTopOverlay: {
     position: "absolute",
@@ -2091,6 +2786,7 @@ const styles = StyleSheet.create({
     paddingTop: 52,
     paddingHorizontal: 14,
     paddingBottom: 120,
+    zIndex: 60,
   },
   storyProgressRow: {
     flexDirection: "row",
@@ -2112,6 +2808,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  storyProfilePressable: {
+    borderRadius: 20,
   },
   storyViewerAvatar: {
     width: 40,
@@ -2137,11 +2836,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  storyBottomOverlay: {
+  storyBottomKeyboard: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 50,
+  },
+  storyBottomOverlay: {
     paddingHorizontal: 14,
     paddingTop: 90,
     paddingBottom: 38,
@@ -2149,10 +2851,14 @@ const styles = StyleSheet.create({
   storyReply: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
+  },
+  storyInputWrap: {
+    flex: 1,
+    position: "relative",
+    justifyContent: "center",
   },
   storyInput: {
-    flex: 1,
     height: 44,
     borderRadius: 999,
     borderWidth: 1,
@@ -2160,6 +2866,26 @@ const styles = StyleSheet.create({
     color: colors.white,
     paddingHorizontal: 16,
     backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  storyInputWithSend: {
+    paddingRight: 50,
+  },
+  storyInputSendButton: {
+    position: "absolute",
+    right: 5,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.burgundy,
+  },
+  storyRoundAction: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
   },
   ownerStoryActions: {
     flexDirection: "row",
@@ -2210,6 +2936,78 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 26,
     gap: 10,
+  },
+  shareSheet: {
+    maxHeight: "78%",
+    backgroundColor: colors.cream,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 26,
+    gap: 10,
+  },
+  shareSearchInput: {
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.text,
+    paddingHorizontal: 14,
+    fontWeight: "700",
+  },
+  shareSelectedText: {
+    color: colors.burgundy,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  shareList: {
+    maxHeight: 330,
+  },
+  shareRecipientSelected: {
+    borderColor: colors.burgundy,
+    backgroundColor: "#FBF3F5",
+  },
+  shareRecipientText: {
+    color: colors.text,
+  },
+  shareActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingTop: 4,
+  },
+  shareExternalButton: {
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  shareExternalText: {
+    color: colors.burgundy,
+    fontWeight: "900",
+  },
+  shareSendButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: colors.burgundy,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shareSendButtonDisabled: {
+    opacity: 0.48,
+  },
+  shareSendText: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 15,
   },
   storySheetSubtitle: {
     color: colors.muted,

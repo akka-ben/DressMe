@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -12,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import {
@@ -160,7 +162,7 @@ export function PostDetailScreen({ postId, onBack }: Props) {
     setSubmitting(true);
     try {
       const createdComment = await client.addPostComment(postId, content, token);
-      setComments((current) => [...current, createdComment]);
+      setComments((current) => [createdComment, ...current]);
       setCommentText("");
       setPost((current) =>
         current ? { ...current, commentCount: current.commentCount + 1 } : current,
@@ -296,6 +298,60 @@ function PostDetailHeader({
 }) {
   const mediaUrl = post.imageUrls[0];
   const isVideo = post.mediaType === "video" || isVideoUrl(mediaUrl);
+  const lastTapRef = useRef(0);
+  const singleTapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const heartOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(
+    () => () => {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const playDoubleTapHeart = useCallback(() => {
+    heartScale.setValue(0.25);
+    heartOpacity.setValue(1);
+    Animated.parallel([
+      Animated.spring(heartScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 130,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartOpacity, {
+        toValue: 0,
+        duration: 720,
+        delay: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [heartOpacity, heartScale]);
+
+  const handleImagePress = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 280) {
+      if (singleTapTimeoutRef.current) {
+        clearTimeout(singleTapTimeoutRef.current);
+        singleTapTimeoutRef.current = null;
+      }
+      lastTapRef.current = 0;
+      Vibration.vibrate(8);
+      playDoubleTapHeart();
+      if (!post.likedByMe) {
+        onLike();
+      }
+      return;
+    }
+
+    lastTapRef.current = now;
+    singleTapTimeoutRef.current = setTimeout(() => {
+      singleTapTimeoutRef.current = null;
+    }, 290);
+  }, [onLike, playDoubleTapHeart, post.likedByMe]);
 
   return (
     <View style={styles.postCard}>
@@ -323,7 +379,21 @@ function PostDetailHeader({
           ) : null}
         </View>
       ) : (
-        <Image source={{ uri: mediaUrl }} style={styles.postImage} />
+        <Pressable onPress={handleImagePress}>
+          <Image source={{ uri: mediaUrl }} style={styles.postImage} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.postDoubleTapHeart,
+              {
+                opacity: heartOpacity,
+                transform: [{ scale: heartScale }],
+              },
+            ]}
+          >
+            <Heart size={104} color={colors.white} fill={colors.white} />
+          </Animated.View>
+        </Pressable>
       )}
 
       <View style={styles.actionRow}>
@@ -595,6 +665,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 430,
     backgroundColor: colors.beige,
+  },
+  postDoubleTapHeart: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 160,
+    alignItems: "center",
+    justifyContent: "center",
   },
   videoFrame: {
     height: 430,

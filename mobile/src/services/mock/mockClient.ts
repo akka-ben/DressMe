@@ -196,7 +196,7 @@ export class MockDressMeClient implements DressMeClient {
 
   async sendConversationMessage(
     conversationId: string,
-    input: { body: string; kind?: "text" | "image" | "audio" },
+    input: { body: string; kind?: "text" | "image" | "audio" | "shared_post" | "shared_ai_look" },
     _token?: string,
   ) {
     await delay();
