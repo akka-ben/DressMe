@@ -63,6 +63,7 @@ export interface DressMeClient {
   sharePost(postId: string, token: string): Promise<Post>;
   togglePostSave(postId: string, token: string): Promise<Post>;
   reportPost(postId: string, input: ReportPostInput, token: string): Promise<ReportPostResult>;
+  deletePost(postId: string, token: string): Promise<void>;
   getPostComments(postId: string, input?: { limit?: number; offset?: number }): Promise<Comment[]>;
   addPostComment(postId: string, content: string, token: string): Promise<Comment>;
   getSavedPosts(input: { token: string; mediaType?: "image" | "video"; limit?: number; offset?: number }): Promise<Post[]>;

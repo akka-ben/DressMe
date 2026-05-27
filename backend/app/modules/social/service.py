@@ -1005,3 +1005,41 @@ async def list_saved_posts(
             posts.append(await post_to_dto(db, post, user_id))
 
     return posts
+
+
+async def delete_post(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    current_user: UserDocument,
+) -> dict:
+    from fastapi import HTTPException
+    post = await db.posts.find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post introuvable.")
+    if post["author_id"] != str(current_user["_id"]):
+        raise HTTPException(status_code=403, detail="Vous ne pouvez pas supprimer ce post.")
+    await db.posts.delete_one({"_id": post_id})
+    await db.post_likes.delete_many({"post_id": post_id})
+    await db.saved_posts.delete_many({"post_id": post_id})
+    await db.comments.delete_many({"post_id": post_id})
+    return {"message": "Post supprime avec succes."}
+
+
+
+async def delete_post(
+    db: AsyncIOMotorDatabase,
+    post_id: str,
+    current_user,
+) -> dict:
+    from fastapi import HTTPException
+    post = await db.posts.find_one({"_id": post_id})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post introuvable.")
+    if post["author_id"] != str(current_user["_id"]):
+        raise HTTPException(status_code=403, detail="Vous ne pouvez pas supprimer ce post.")
+    await db.posts.delete_one({"_id": post_id})
+    await db.post_likes.delete_many({"post_id": post_id})
+    await db.saved_posts.delete_many({"post_id": post_id})
+    await db.comments.delete_many({"post_id": post_id})
+    return {"message": "Post supprime avec succes."}
+

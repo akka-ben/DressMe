@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Alert, ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Mail, LockKeyhole } from "lucide-react-native";
+import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react-native";
 
 import { PrimaryButton } from "../components/PrimaryButton";
 import { ApiError } from "../services/api/apiClient";
@@ -15,7 +15,6 @@ type Props = {
   onOpenForgotPassword?: () => void;
 };
 
-
 export function LoginScreen({
   initialEmail = "",
   onLoginSuccess,
@@ -25,6 +24,7 @@ export function LoginScreen({
   const { login, user } = useAuth();
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Connectez-vous avec votre compte DressMe.");
 
@@ -79,6 +79,8 @@ export function LoginScreen({
         </View>
         <Text style={styles.title}>Bon retour</Text>
         <Text style={styles.subtitle}>Connectez-vous pour retrouver votre feed fashion.</Text>
+
+        {/* Email */}
         <View style={styles.inputRow}>
           <Mail size={18} color={colors.burgundy} />
           <TextInput
@@ -92,6 +94,8 @@ export function LoginScreen({
             value={email}
           />
         </View>
+
+        {/* Mot de passe avec icone voir/masquer */}
         <View style={styles.inputRow}>
           <LockKeyhole size={18} color={colors.burgundy} />
           <TextInput
@@ -99,30 +103,42 @@ export function LoginScreen({
             onChangeText={setPassword}
             placeholder="Mot de passe"
             placeholderTextColor={colors.muted}
-            secureTextEntry
+            secureTextEntry={!showPassword}
             style={styles.input}
             value={password}
           />
+          <Pressable
+            onPress={() => setShowPassword((prev) => !prev)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? "Masquer le mot de passe" : "Voir le mot de passe"}
+          >
+            {showPassword
+              ? <EyeOff size={18} color={colors.muted} />
+              : <Eye size={18} color={colors.muted} />
+            }
+          </Pressable>
         </View>
-      <PrimaryButton
-        disabled={loading}
-        label={loading ? "Connexion..." : "Se connecter"}
-        onPress={handleLogin}
-      />
-      <View style={styles.actions}>
-        <PrimaryButton label="Créer un compte" variant="secondary" onPress={() => onOpenRegister?.()} />
-        <PrimaryButton label="Mot de passe oublié" variant="ghost" onPress={() => onOpenForgotPassword?.()} />
-      </View>
-      {loading ? (
-        <ActivityIndicator color={colors.burgundy} />
-      ) : (
-        <>
-          <Text style={styles.meta}>
-            {user ? `Connecte en tant que ${user.firstName} ${user.lastName}` : "Non connecte"}
-          </Text>
-          <Text style={styles.meta}>{message}</Text>
-        </>
-      )}
+
+        <PrimaryButton
+          disabled={loading}
+          label={loading ? "Connexion..." : "Se connecter"}
+          onPress={handleLogin}
+        />
+        <View style={styles.actions}>
+          <PrimaryButton label="Créer un compte" variant="secondary" onPress={() => onOpenRegister?.()} />
+          <PrimaryButton label="Mot de passe oublié" variant="ghost" onPress={() => onOpenForgotPassword?.()} />
+        </View>
+        {loading ? (
+          <ActivityIndicator color={colors.burgundy} />
+        ) : (
+          <>
+            <Text style={styles.meta}>
+              {user ? `Connecte en tant que ${user.firstName} ${user.lastName}` : "Non connecte"}
+            </Text>
+            <Text style={styles.meta}>{message}</Text>
+          </>
+        )}
       </View>
     </LinearGradient>
   );

@@ -92,14 +92,11 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
   }, [focusCommentComposer, initialFocusComment, loading]);
 
   const toggleLike = async () => {
-    if (!post || liking) {
-      return;
-    }
+    if (!post || liking) return;
     if (!token) {
       Alert.alert("Connexion requise", "Connecte-toi pour aimer cette publication.");
       return;
     }
-
     const previousPost = post;
     setLiking(true);
     setPost({
@@ -107,7 +104,6 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
       likedByMe: !post.likedByMe,
       likeCount: Math.max(0, post.likeCount + (post.likedByMe ? -1 : 1)),
     });
-
     try {
       const updatedPost = await client.togglePostLike(post.id, token);
       setPost(updatedPost);
@@ -120,18 +116,14 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
   };
 
   const toggleSave = async () => {
-    if (!post || saving) {
-      return;
-    }
+    if (!post || saving) return;
     if (!token) {
       Alert.alert("Connexion requise", "Connecte-toi pour enregistrer cette publication.");
       return;
     }
-
     const previousPost = post;
     setSaving(true);
     setPost({ ...post, savedByMe: !post.savedByMe });
-
     try {
       const updatedPost = await client.togglePostSave(post.id, token);
       setPost(updatedPost);
@@ -147,31 +139,21 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
   };
 
   const openShareSheet = () => {
-    if (!post) {
-      return;
-    }
+    if (!post) return;
     setShareVisible(true);
   };
 
   const shareCurrentPostExternally = async () => {
-    if (!post) {
-      return;
-    }
-
+    if (!post) return;
     const displayAuthor = toDisplayUser(post.author);
     const mediaUrl = post.imageUrls[0] ?? "";
-
     try {
       const result = await Share.share({
         title: "DressMe",
         message: `${displayAuthor.name} sur DressMe\n\n${post.caption}\n${post.hashtags.join(" ")}${mediaUrl ? `\n${mediaUrl}` : ""}`,
         url: mediaUrl || undefined,
       });
-
-      if (result.action === Share.dismissedAction || !token) {
-        return;
-      }
-
+      if (result.action === Share.dismissedAction || !token) return;
       const updatedPost = await client.sharePost(post.id, token);
       setPost(updatedPost);
     } catch (shareError) {
@@ -184,29 +166,23 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
 
   const submitComment = async () => {
     const content = commentText.trim();
-    if (!content || submitting) {
-      return;
-    }
-
+    if (!content || submitting) return;
     if (!token || !user) {
       Alert.alert("Connexion requise", "Connecte-toi pour commenter cette publication.");
       return;
     }
-
     const optimisticComment: Comment = {
       id: `local-comment-${Date.now()}`,
       author: user,
       content,
       createdAt: new Date().toISOString(),
     };
-
     setSubmitting(true);
     setComments((current) => [optimisticComment, ...current]);
     setCommentText("");
     setPost((current) =>
       current ? { ...current, commentCount: current.commentCount + 1 } : current,
     );
-
     try {
       const createdComment = await client.addPostComment(postId, content, token);
       setComments((current) =>
@@ -228,6 +204,31 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
       setSubmitting(false);
     }
   };
+
+  // ── Suppression du post ────────────────────────────────────────────────────
+  const handleDeletePost = () => {
+    Alert.alert(
+      "Supprimer la publication",
+      "Cette action est irreversible. Voulez-vous continuer ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            if (!post || !token) return;
+            try {
+              await client.deletePost(post.id, token);
+              onBack();
+            } catch (e) {
+              Alert.alert("Erreur", "Impossible de supprimer la publication.");
+            }
+          },
+        },
+      ],
+    );
+  };
+  // ──────────────────────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView
@@ -319,6 +320,7 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
       <PostDetailActionSheet
         visible={menuVisible && Boolean(post)}
         post={post}
+        isOwnPost={Boolean(post && user && post.author.id === user.id)}
         onClose={() => setMenuVisible(false)}
         onShare={() => {
           setMenuVisible(false);
@@ -335,6 +337,10 @@ export function PostDetailScreen({ postId, onBack, initialFocusComment = false }
         onReport={() => {
           setMenuVisible(false);
           setReportVisible(true);
+        }}
+        onDelete={() => {
+          setMenuVisible(false);
+          handleDeletePost();
         }}
       />
       <PostReportModal
@@ -424,7 +430,6 @@ function PostDetailHeader({
       }
       return;
     }
-
     lastTapRef.current = now;
     singleTapTimeoutRef.current = setTimeout(() => {
       singleTapTimeoutRef.current = null;
@@ -553,19 +558,23 @@ function PostDetailHeader({
 function PostDetailActionSheet({
   visible,
   post,
+  isOwnPost,
   onClose,
   onShare,
   onSave,
   onRefresh,
   onReport,
+  onDelete,
 }: {
   visible: boolean;
   post: Post | null;
+  isOwnPost: boolean;
   onClose: () => void;
   onShare: () => void;
   onSave: () => void;
   onRefresh: () => void;
   onReport: () => void;
+  onDelete: () => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -584,9 +593,16 @@ function PostDetailActionSheet({
           <Pressable style={styles.sheetOption} onPress={onRefresh}>
             <Text style={styles.sheetOptionText}>Actualiser</Text>
           </Pressable>
-          <Pressable style={styles.sheetOption} onPress={onReport}>
-            <Text style={[styles.sheetOptionText, styles.sheetOptionDanger]}>Signaler</Text>
-          </Pressable>
+          {isOwnPost && (
+            <Pressable style={styles.sheetOption} onPress={onDelete}>
+              <Text style={[styles.sheetOptionText, styles.sheetOptionDanger]}>Supprimer</Text>
+            </Pressable>
+          )}
+          {!isOwnPost && (
+            <Pressable style={styles.sheetOption} onPress={onReport}>
+              <Text style={[styles.sheetOptionText, styles.sheetOptionDanger]}>Signaler</Text>
+            </Pressable>
+          )}
           <Pressable style={[styles.sheetOption, styles.sheetCancel]} onPress={onClose}>
             <Text style={styles.sheetCancelText}>Annuler</Text>
           </Pressable>
@@ -633,28 +649,20 @@ function PostDetailShareSheet({
     const loadUsers = async () => {
       if (token && currentUserId) {
         const following = await client.getFollowing(currentUserId, token);
-        if (following.length) {
-          return following;
-        }
+        if (following.length) return following;
       }
       return client.getChatUsers(token);
     };
 
     loadUsers()
       .then((apiUsers) => {
-        if (mounted) {
-          setUsers(apiUsers);
-        }
+        if (mounted) setUsers(apiUsers);
       })
       .catch(() => {
-        if (mounted) {
-          setUsers([]);
-        }
+        if (mounted) setUsers([]);
       })
       .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       });
 
     return () => {
@@ -664,9 +672,7 @@ function PostDetailShareSheet({
 
   const filteredUsers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return users;
-    }
+    if (!normalizedQuery) return users;
     return users.filter((item) => {
       const displayUser = toDisplayUser(item);
       return `${displayUser.name} ${displayUser.username}`.toLowerCase().includes(normalizedQuery);
@@ -682,10 +688,7 @@ function PostDetailShareSheet({
   };
 
   const sendInternalShare = async () => {
-    if (!post || !token || selectedIds.length === 0 || sending) {
-      return;
-    }
-
+    if (!post || !token || selectedIds.length === 0 || sending) return;
     const previousPost = post;
     setSending(true);
     onShared({ ...post, shareCount: post.shareCount + 1 });
@@ -850,30 +853,19 @@ function toDisplayUser(user: User): DisplayUser {
 }
 
 function avatarForUser(user: User | null): string {
-  if (user?.avatarUrl) {
-    return user.avatarUrl;
-  }
+  if (user?.avatarUrl) return user.avatarUrl;
   const seed = user?.id || user?.email || "dressme";
   return `https://api.dicebear.com/8.x/avataaars/png?seed=${encodeURIComponent(seed)}`;
 }
 
 function formatRelativeDate(value: string): string {
   const createdAt = new Date(value).getTime();
-  if (Number.isNaN(createdAt)) {
-    return "maintenant";
-  }
-
+  if (Number.isNaN(createdAt)) return "maintenant";
   const diffMinutes = Math.max(0, Math.floor((Date.now() - createdAt) / 60000));
-  if (diffMinutes < 1) {
-    return "maintenant";
-  }
-  if (diffMinutes < 60) {
-    return `${diffMinutes} min`;
-  }
+  if (diffMinutes < 1) return "maintenant";
+  if (diffMinutes < 60) return `${diffMinutes} min`;
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `${diffHours} h`;
-  }
+  if (diffHours < 24) return `${diffHours} h`;
   return `${Math.floor(diffHours / 24)} j`;
 }
 

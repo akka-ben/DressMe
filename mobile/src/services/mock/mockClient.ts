@@ -301,4 +301,8 @@ export class MockDressMeClient implements DressMeClient {
     await delay();
     return { postId: "", likeCount: 0, commentCount: 0, shareCount: 0, saveCount: 0 };
   }
+
+  async deletePost(): Promise<void> {
+  throw new Error("Mock deletePost is disabled. Use ApiDressMeClient.");
+}
 }

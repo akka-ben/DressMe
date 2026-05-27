@@ -1,28 +1,37 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { ArrowLeft, CheckCircle2, Grid3X3, MessageCircle, Share2, UserCheck, UserPlus, Video } from "lucide-react-native";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Grid3X3,
+  MessageCircle,
+  Share2,
+  UserCheck,
+  UserPlus,
+  Video,
+} from "lucide-react-native";
+
 import { useAuth } from "../context/AuthContext";
 import { client } from "../services";
 import { colors, fonts, radius, shadow } from "../theme/dressme";
 import type { Post, Profile, User } from "../types/contracts";
 import { isOnline } from "../utils/onlineStatus";
-import { iconTouchHitSlop, touchHitSlop, touchRetentionOffset } from "../utils/touchTargets";
-import { Share } from "react-native";
-
 
 type Props = {
   userId: string;
   onBack?: () => void;
   onOpenPost?: (postId: string) => void;
   onMessage?: (userId: string) => void;
-  onOpenProfile?: (userId: string) => void; // ← ajouté
+  onOpenProfile?: (userId: string) => void;
 };
 
 type Tab = "posts" | "videos";
@@ -32,7 +41,7 @@ export function UserProfileScreen({
   onBack,
   onOpenPost,
   onMessage,
-  onOpenProfile, // ← ajouté
+  onOpenProfile,
 }: Props) {
   const { token, user: me } = useAuth();
 
@@ -40,19 +49,20 @@ export function UserProfileScreen({
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("posts");
   const [suggestions, setSuggestions] = useState<User[]>([]);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
 
-  // ── Charger le profil + posts ────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [profileData, postsData, suggestionsData] = await Promise.all([
-        client.getProfile(userId, { token: token ?? undefined }),
+        client.getProfile(userId),
         client.getUserPosts(userId, token ?? undefined),
         client.getSuggestions(userId, token ?? undefined),
       ]);
-
       setProfile(profileData);
       setPosts(postsData);
       setSuggestions(suggestionsData);
@@ -67,20 +77,22 @@ export function UserProfileScreen({
     void load();
   }, [load]);
 
-  // ── Follow / Unfollow ────────────────────────────────────────────────────
   const toggleFollow = async () => {
-    if (!token || !profile || profile.followStatus === "self") return;
+    if (!token) return;
     setFollowLoading(true);
     try {
-      const shouldUnfollow =
-        profile.followStatus === "following" || profile.followStatus === "requested";
-
-      if (shouldUnfollow) {
-        const updatedProfile = await client.unfollowUser(userId, token);
-        setProfile(updatedProfile);
+      if (isFollowing) {
+        await client.unfollowUser(userId, token);
+        setIsFollowing(false);
+        setProfile((prev) =>
+          prev ? { ...prev, followerCount: Math.max(0, prev.followerCount - 1) } : prev
+        );
       } else {
-        const updatedProfile = await client.followUser(userId, token);
-        setProfile(updatedProfile);
+        await client.followUser(userId, token);
+        setIsFollowing(true);
+        setProfile((prev) =>
+          prev ? { ...prev, followerCount: prev.followerCount + 1 } : prev
+        );
       }
     } catch (e) {
       console.warn("Erreur follow/unfollow:", e);
@@ -89,65 +101,73 @@ export function UserProfileScreen({
     }
   };
 
-  // ── Données grille ───────────────────────────────────────────────────────
+  const toggleBlock = async () => {
+    if (!token) return;
+    setBlockLoading(true);
+    try {
+      if (isBlocked) {
+        await client.unblockUser(userId, token);
+        setIsBlocked(false);
+      } else {
+        Alert.alert(
+          "Bloquer cet utilisateur ?",
+          "Il ne pourra plus voir votre profil ni vous contacter.",
+          [
+            { text: "Annuler", style: "cancel", onPress: () => setBlockLoading(false) },
+            {
+              text: "Bloquer",
+              style: "destructive",
+              onPress: async () => {
+                await client.blockUser(userId, token);
+                setIsBlocked(true);
+                setIsFollowing(false);
+                setBlockLoading(false);
+              },
+            },
+          ]
+        );
+        return;
+      }
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible d'effectuer cette action.");
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const shareProfile = async () => {
+    const displayName = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim();
+    const name = displayName || `@${username}`;
+    try {
+      await Share.share({
+        title: `Profil de ${name} sur DressMe`,
+        message: `Découvre le profil de ${name} sur DressMe 👗\ndressme://profile/${userId}`,
+      });
+    } catch (e) {
+      console.warn("Erreur partage:", e);
+    }
+  };
+
   const gridPosts =
     activeTab === "videos"
       ? posts.filter((p) => p.mediaType === "video")
       : posts.filter((p) => p.mediaType === "image");
 
   const isOwnProfile = me?.id === userId;
-  const followStatus = profile?.followStatus ?? "not_following";
-  const isFollowing = followStatus === "following";
-  const isRequested = followStatus === "requested";
-  const isFollowActive = isFollowing || isRequested;
-  const followLabel = isFollowing
-    ? "Abonné"
-    : isRequested
-      ? "Demande envoyée"
-      : profile?.isPrivate
-        ? "Demander"
-        : "S'abonner";
-
-  // ── Affichage ────────────────────────────────────────────────────────────
-  const displayName =
-    `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim() || "—";
-  const username = profile?.email
-    ? profile.email.split("@")[0]
-    : "utilisateur";
-
-  const shareProfile = async () => {
-  const name = displayName !== "—" ? displayName : `@${username}`;
-  try {
-    await Share.share({
-      title: `Profil de ${name} sur DressMe`,
-      message: `Découvre le profil de ${name} sur DressMe 👗\ndressme://profile/${userId}`,
-    });
-  } catch (e) {
-    console.warn("Erreur partage:", e);
-  }
-};
+  const displayName = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim() || "—";
+  const username = profile?.email ? profile.email.split("@")[0] : "utilisateur";
 
   return (
     <View style={styles.shell}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          hitSlop={iconTouchHitSlop}
-          onPress={onBack}
-          pressRetentionOffset={touchRetentionOffset}
-          style={styles.backBtn}
-        >
+        <Pressable style={styles.backBtn} onPress={onBack}>
           <ArrowLeft size={20} color={colors.burgundy} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           @{username}
         </Text>
-        <Pressable
-          hitSlop={iconTouchHitSlop}
-          onPress={() => void shareProfile()}
-          pressRetentionOffset={touchRetentionOffset}
-          style={styles.shareBtn}
-        >
+        <Pressable style={styles.shareBtn} onPress={() => void shareProfile()}>
           <Share2 size={18} color={colors.burgundy} />
         </Pressable>
       </View>
@@ -164,10 +184,7 @@ export function UserProfileScreen({
             <View style={styles.profileTop}>
               <View>
                 {profile?.avatarUrl ? (
-                  <Image
-                    source={{ uri: profile.avatarUrl }}
-                    style={styles.avatar}
-                  />
+                  <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarPlaceholder]}>
                     <Text style={styles.avatarInitials}>
@@ -175,24 +192,13 @@ export function UserProfileScreen({
                     </Text>
                   </View>
                 )}
-                {isOnline(profile?.lastSeen) && (
-                  <View style={styles.onlineDot} />
-                )}
+                {isOnline(profile?.lastSeen) && <View style={styles.onlineDot} />}
               </View>
 
               <View style={styles.stats}>
-                <Stat
-                  label="Publications"
-                  value={String(profile?.postCount ?? posts.length)}
-                />
-                <Stat
-                  label="Abonnés"
-                  value={formatNumber(profile?.followerCount ?? 0)}
-                />
-                <Stat
-                  label="Abonnements"
-                  value={formatNumber(profile?.followingCount ?? 0)}
-                />
+                <Stat label="Publications" value={String(profile?.postCount ?? posts.length)} />
+                <Stat label="Abonnés" value={formatNumber(profile?.followerCount ?? 0)} />
+                <Stat label="Abonnements" value={formatNumber(profile?.followingCount ?? 0)} />
               </View>
             </View>
 
@@ -204,52 +210,57 @@ export function UserProfileScreen({
             {profile?.bio ? (
               <Text style={styles.bio}>{profile.bio}</Text>
             ) : (
-              <Text style={[styles.bio, { color: colors.muted }]}>
-                Aucune bio renseignée.
-              </Text>
+              <Text style={[styles.bio, { color: colors.muted }]}>Aucune bio renseignée.</Text>
             )}
 
-            {/* Boutons action — masqués si c'est son propre profil */}
+            {/* Boutons action */}
             {!isOwnProfile && (
               <View style={styles.actions}>
                 <Pressable
-                  hitSlop={touchHitSlop}
-                  pressRetentionOffset={touchRetentionOffset}
-                  style={[
-                    styles.followBtn,
-                    isFollowActive && styles.followBtnActive,
-                  ]}
+                  style={[styles.followBtn, isFollowing && styles.followBtnActive]}
                   onPress={toggleFollow}
                   disabled={followLoading}
                 >
                   {followLoading ? (
                     <ActivityIndicator
-                      color={isFollowActive ? colors.burgundy : colors.white}
+                      color={isFollowing ? colors.burgundy : colors.white}
                       size="small"
                     />
-                  ) : isFollowActive ? (
+                  ) : isFollowing ? (
                     <>
                       <UserCheck size={16} color={colors.burgundy} />
                       <Text style={[styles.followBtnText, { color: colors.burgundy }]}>
-                        {followLabel}
+                        Abonné
                       </Text>
                     </>
                   ) : (
                     <>
                       <UserPlus size={16} color={colors.white} />
-                      <Text style={styles.followBtnText}>{followLabel}</Text>
+                      <Text style={styles.followBtnText}>S'abonner</Text>
                     </>
                   )}
                 </Pressable>
 
                 <Pressable
-                  hitSlop={touchHitSlop}
-                  pressRetentionOffset={touchRetentionOffset}
                   style={styles.msgBtn}
                   onPress={() => onMessage?.(userId)}
                 >
                   <MessageCircle size={16} color={colors.burgundy} />
                   <Text style={styles.msgBtnText}>Message</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.blockBtn, isBlocked && styles.blockBtnActive]}
+                  onPress={() => void toggleBlock()}
+                  disabled={blockLoading}
+                >
+                  {blockLoading ? (
+                    <ActivityIndicator size="small" color={colors.burgundy} />
+                  ) : (
+                    <Text style={[styles.blockBtnText, isBlocked && { color: colors.burgundy }]}>
+                      {isBlocked ? "Débloquer" : "Bloquer"}
+                    </Text>
+                  )}
                 </Pressable>
               </View>
             )}
@@ -271,7 +282,7 @@ export function UserProfileScreen({
             />
           </View>
 
-          {/* Suggestions — seulement si des suggestions existent et que ce n'est pas son propre profil */}
+          {/* Suggestions */}
           {suggestions.length > 0 && !isOwnProfile && (
             <View style={styles.suggestionsBox}>
               <Text style={styles.suggestionsTitle}>Vous connaissez peut-être</Text>
@@ -279,8 +290,6 @@ export function UserProfileScreen({
                 {suggestions.map((s) => (
                   <Pressable
                     key={s.id}
-                    hitSlop={touchHitSlop}
-                    pressRetentionOffset={touchRetentionOffset}
                     style={styles.suggestionItem}
                     onPress={() => onOpenProfile?.(s.id)}
                   >
@@ -307,28 +316,19 @@ export function UserProfileScreen({
             {gridPosts.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyTitle}>
-                  {activeTab === "videos"
-                    ? "Aucune vidéo publiée"
-                    : "Aucune publication"}
+                  {activeTab === "videos" ? "Aucune vidéo publiée" : "Aucune publication"}
                 </Text>
-                <Text style={styles.emptyText}>
-                  Les publications apparaîtront ici.
-                </Text>
+                <Text style={styles.emptyText}>Les publications apparaîtront ici.</Text>
               </View>
             ) : (
               gridPosts.map((post) => (
                 <Pressable
                   key={post.id}
-                  hitSlop={touchHitSlop}
-                  pressRetentionOffset={touchRetentionOffset}
                   style={styles.tile}
                   onPress={() => onOpenPost?.(post.id)}
                 >
                   {post.imageUrls[0] ? (
-                    <Image
-                      source={{ uri: post.imageUrls[0] }}
-                      style={styles.tileImage}
-                    />
+                    <Image source={{ uri: post.imageUrls[0] }} style={styles.tileImage} />
                   ) : (
                     <View style={styles.tilePlaceholder}>
                       <Video size={20} color={colors.white} />
@@ -346,8 +346,6 @@ export function UserProfileScreen({
     </View>
   );
 }
-
-// ── Sous-composants ──────────────────────────────────────────────────────────
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -371,28 +369,20 @@ function TabButton({
 }) {
   return (
     <Pressable
-      hitSlop={touchHitSlop}
-      pressRetentionOffset={touchRetentionOffset}
       style={[styles.tab, active && styles.tabActive]}
       onPress={onPress}
     >
       <Icon size={17} color={active ? colors.burgundy : colors.muted} />
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>
-        {label}
-      </Text>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
     </Pressable>
   );
 }
-
-// ── Utilitaires ──────────────────────────────────────────────────────────────
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
 }
-
-// ── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   shell: { gap: 13 },
@@ -402,6 +392,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadow.card,
+  },
+  shareBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -470,7 +471,7 @@ const styles = StyleSheet.create({
   nameLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   name: { color: colors.text, fontWeight: "900", fontSize: 16 },
   bio: { color: colors.text, lineHeight: 19, fontSize: 13 },
-  actions: { flexDirection: "row", gap: 10, marginTop: 4 },
+  actions: { flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" },
   followBtn: {
     flex: 1,
     flexDirection: "row",
@@ -510,6 +511,23 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 14,
   },
+  blockBtn: {
+    alignSelf: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.burgundy,
+    backgroundColor: colors.white,
+  },
+  blockBtnActive: {
+    backgroundColor: colors.cream,
+  },
+  blockBtnText: {
+    color: colors.burgundy,
+    fontWeight: "700",
+    fontSize: 13,
+  },
   tabs: {
     flexDirection: "row",
     backgroundColor: colors.white,
@@ -530,6 +548,54 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.cream },
   tabText: { color: colors.muted, fontSize: 12, fontWeight: "700" },
   tabTextActive: { color: colors.burgundy },
+  suggestionsBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    gap: 10,
+    ...shadow.card,
+  },
+  suggestionsTitle: {
+    color: colors.text,
+    fontWeight: "900",
+    fontSize: 14,
+  },
+  suggestionsList: {
+    flexDirection: "row",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  suggestionItem: {
+    alignItems: "center",
+    gap: 5,
+    width: 60,
+  },
+  suggestionAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.beige,
+    borderWidth: 2,
+    borderColor: colors.gold,
+  },
+  suggestionAvatarPlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.burgundy,
+  },
+  suggestionInitials: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 18,
+  },
+  suggestionName: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 2 },
   tile: {
     width: "32.9%",
@@ -579,63 +645,4 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.white,
   },
-  suggestionsBox: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    gap: 10,
-    ...shadow.card,
-  },
-  suggestionsTitle: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 14,
-  },
-  suggestionsList: {
-    flexDirection: "row",
-    gap: 14,
-    flexWrap: "wrap",
-  },
-  suggestionItem: {
-    alignItems: "center",
-    gap: 5,
-    width: 60,
-  },
-  suggestionAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.beige,
-    borderWidth: 2,
-    borderColor: colors.gold,
-  },
-  suggestionAvatarPlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.burgundy,
-  },
-  suggestionInitials: {
-    color: colors.white,
-    fontWeight: "900",
-    fontSize: 18,
-  },
-  suggestionName: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  shareBtn: {
-  width: 38,
-  height: 38,
-  borderRadius: 19,
-  backgroundColor: colors.white,
-  borderWidth: 1,
-  borderColor: colors.border,
-  alignItems: "center",
-  justifyContent: "center",
-  ...shadow.card,
-},
 });

@@ -679,6 +679,16 @@ export class ApiDressMeClient implements DressMeClient {
     return mapPost(post);
   }
 
+  async deletePost(postId: string, token: string): Promise<void> {
+  await this.request<void>(
+    `/posts/${postId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+}
+
   async reportPost(postId: string, input: ReportPostInput, token: string): Promise<ReportPostResult> {
     return this.request<BackendMessage>(
       `/posts/${postId}/report`,

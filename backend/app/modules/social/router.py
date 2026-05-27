@@ -185,3 +185,23 @@ async def saved_posts(
     current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
 ) -> list[PostDTO]:
     return await service.list_saved_posts(db, current_user, media_type, limit, offset)
+
+
+@router.delete("/posts/{post_id}", response_model=MessageResponse)
+async def delete_post(
+    post_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user: auth_service.UserDocument = Depends(auth_service.get_current_user),
+) -> MessageResponse:
+    return await service.delete_post(db, post_id, current_user)
+
+
+
+@router.delete("/posts/{post_id}")
+async def delete_post(
+    post_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user = Depends(auth_service.get_current_user),
+):
+    return await service.delete_post(db, post_id, current_user)
+
